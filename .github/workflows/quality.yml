@@ -1,0 +1,27 @@
+name: Repository Quality Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -r requirements-dev.lock
+      - run: python -m pip install --no-deps -e .
+      - run: ruff check .
+      - run: python -m compileall -q app scripts tests
+      - run: pytest -q
+      - run: python -m scripts.check_repository
+      - run: git diff --check
