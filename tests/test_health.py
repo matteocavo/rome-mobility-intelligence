@@ -29,6 +29,7 @@ def test_model_info_and_loaded_readiness(bundle):
         assert data["synthetic"] is True
         assert 0 < data["threshold"] < 1
         assert "validation_metrics" in data and "test_metrics" in data
+        assert "training_data_reference" in data
 
 
 def test_empty_artifact_environment_is_skeleton(monkeypatch):
@@ -37,3 +38,19 @@ def test_empty_artifact_environment_is_skeleton(monkeypatch):
     assert settings.model_artifact_path is None
     with TestClient(create_app(settings)) as client:
         assert client.get("/ready").json()["mode"] == "skeleton"
+
+
+def test_model_info_reference_excludes_private_queries(bundle):
+    from app.services.model_service import ModelService
+
+    service = ModelService(bundle)
+    service.metadata.training_data_reference["partitions"] = {
+        "train": {
+            "exported_rows": 200,
+            "query": "private-sql",
+            "parameters": {"start": 1},
+            "strata_allocation": [{"n": 10}],
+        }
+    }
+    reference = service.info()["training_data_reference"]
+    assert reference["partitions"]["train"] == {"exported_rows": 200}

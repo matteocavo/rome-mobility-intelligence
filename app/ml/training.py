@@ -19,6 +19,7 @@ def train(
     code_sha: str,
     synthetic: bool,
     seed: int = 42,
+    freeze_callback=None,
 ):
     plan = TemporalPlan(**reference["temporal_plan"])
     if set(partitions) != {"train", "validation", "test"}:
@@ -74,6 +75,17 @@ def train(
         key=lambda k: (candidates[k]["metrics"]["f1"], candidates[k]["metrics"]["pr_auc"], k),
     )
     winner, pipeline = candidates[chosen], fitted[chosen]
+    if freeze_callback is not None:
+        freeze_callback(
+            pipeline,
+            {
+                "selected_candidate": chosen,
+                "threshold": winner["threshold"],
+                "candidate_validation": candidates,
+                "code_sha": code_sha,
+                "training_data_reference": reference,
+            },
+        )
     test_probability = pipeline.predict_proba(test[list(FEATURES)])[:, 1]
     test_metrics = evaluate(test[LABEL], test_probability, winner["threshold"])
     metadata = ArtifactMetadata(

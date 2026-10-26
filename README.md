@@ -1,8 +1,9 @@
 # Rome Mobility Intelligence
 
 Foundation **FastAPI + scikit-learn** per il futuro ML operativo del trasporto pubblico di Roma.
-Stato: implementazione locale da revisionare, testata con fixture sintetiche; **nessun modello
-addestrato sui dati reali, nessuna inference live, nessun deployment**.
+Stato: **primo artifact sklearn reale addestrato e validato localmente**, pronto per review.
+HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
+**Nessuna inference live o deployment**. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 Il [repository Data/ML](https://github.com/matteocavo/rome-public-transport-reliability)
 rimane la sorgente di ingestion GTFS/GTFS-RT, Bronze/Silver, enrichment, feature engineering,
@@ -71,7 +72,8 @@ python -m scripts.train_model --source databricks --plan data_exports/private-pl
 
 Richiede configurazione privata, versione training **12** esplicita, confini temporali
 congelati, budget e misure pilota di capacità. Nessun fallback a latest o allo storico v8.
-Questa fase **non ha eseguito l'export né il training reale**. Vedere
+Il primo export e training reale sono stati completati su v12; artifact e dati restano locali,
+fuori Git. [Valutazione reale](docs/REAL_MODEL_EVALUATION.md). Vedere
 [accesso dati](docs/DATA_ACCESS.md) e [training/valutazione](docs/MODEL_TRAINING.md).
 
 ## API
@@ -105,11 +107,24 @@ delle API pandas/sklearn; non viene dichiarata copertura statica completa.
 
 ## Roadmap
 
-1. Revisionare la foundation e misurare capacità/export reale su host scelto.
-2. Valutare un modello operativo su dati reali e su nuove date TEST indipendenti.
+1. Revisionare il primo artifact reale e il protocollo di valutazione.
+2. Acquisire nuove date TEST indipendenti e rivalidare prima del serving operativo.
 3. Accettare freshness, autenticazione e serving inference.
 4. Aggiungere prediction history, poi orchestrazione n8n.
 5. React e UX/UI con Google AI Studio, in una fase successiva.
 
 Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundation.
 [Architettura e responsabilità](docs/ARCHITECTURE.md).
+
+## Artifact reale locale
+
+Per avviare soltanto metadata/readiness con il bundle validato, presente solo sulla macchina di training:
+
+```powershell
+$env:MODEL_ARTIFACT_PATH="artifacts/real-sklearn-20261026-v1"
+python -m uvicorn app.main:app
+```
+
+Il clone Git non include il modello. Con artifact non configurato resta la modalità skeleton.
+Non rilanciare il training sullo stesso TEST per ottimizzarlo. Il training effettivo usa il commit
+`f9dbf187185a2c9426970b42f2dfa9748615f45d`; le modifiche documentali successive non riaddestrano il modello.

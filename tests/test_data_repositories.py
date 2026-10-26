@@ -78,6 +78,47 @@ def test_training_export_has_no_latest_version_fallback():
     client.select.assert_not_called()
 
 
+def test_opt_in_uniform_evaluation_sampling_keeps_labels_out_of_ordering(frame):
+    splits = temporal_split(frame, FIXTURE_PLAN)
+    client = MagicMock()
+    replies = []
+    budget = 80
+    for name, start, end, cutoff in FIXTURE_PLAN.partitions():
+        population = frame[frame.feed_timestamp.ge(start) & frame.feed_timestamp.lt(end)]
+        sample = splits[name].copy() if name == "train" else splits[name].iloc[:budget].copy()
+        replies += [
+            pd.DataFrame(
+                [
+                    {
+                        "total": len(population),
+                        "rejected": 0,
+                        "purged": int(population.label_source_feed_timestamp.ge(cutoff).sum()),
+                    }
+                ]
+            ),
+            pd.DataFrame([{"duplicate_groups": 0}]),
+            sample,
+        ]
+    client.select.side_effect = replies
+    _, manifest = TrainingRepository(client, Settings(_env_file=None)).extract(
+        FIXTURE_PLAN,
+        version=12,
+        train_budget=1000,
+        evaluation_budget=budget,
+        max_bytes=1_000_000,
+        seed=42,
+        evaluation_sample=True,
+    )
+    for name in ["validation", "test"]:
+        entry = manifest["partitions"][name]
+        assert entry["exported_rows"] == budget
+        assert 0 < entry["evaluation_inclusion_probability"] < 1
+        ordering = entry["query"].split("ORDER BY")[1]
+        assert CONTRACT["target"]["label_column"] not in ordering
+        assert "evaluation_seed" in ordering
+        guard_select(entry["query"])
+
+
 def test_stratified_training_preserves_strata_and_records_weights(frame):
     f = frame.copy()
     f["feed_hour"] = 10

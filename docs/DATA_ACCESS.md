@@ -11,7 +11,8 @@ DDL/DML/command/SELECT INTO, anche annidati. Non costituisce un confine di autor
 il principal Databricks deve avere solo i privilegi SELECT necessari. Nessun metodo writer.
 Identificatori catalog/schema/tabella validati separatamente; valori tramite parameter binding.
 Cursor/connessione chiusi anche su errore. Nessun retry automatico o log di parametri/token.
-Questa iterazione non ha aperto connessioni reali né modificato workspace o Job.
+La foundation iniziale non apriva connessioni reali; il successivo training reale ha usato
+solo SELECT, senza modificare workspace o Job. [Report](REAL_MODEL_EVALUATION.md).
 
 ## Export riproducibile
 
@@ -27,7 +28,9 @@ Questa iterazione non ha aperto connessioni reali né modificato workspace o Job
    Registrare SQL esatto, seed, conteggi, quote/probabilità tramite `n` e quota,
    pesi inversi e checksum delle chiavi. Nessun `rand()` e nessun LIMIT arbitrario.
 6. Validation/TEST completi, temporali e a prevalenza naturale. Se superano il budget,
-   **fermarsi**: la foundation non introduce campionamento di valutazione implicito.
+   **fermarsi per default**. Solo con opt-in `evaluation_sample=true` è consentito un
+   campione uniforme deterministico label-independent, con frazione e prevalenza dichiarate;
+   non viene introdotto alcun bilanciamento implicito delle classi.
 7. Il client legge batch di massimo 1000 righe, con limite totale righe e byte pandas.
    Una riga oltre il limite o il budget byte causa errore, mai una restituzione parziale.
    Il consumo transitorio di un batch e le copie pandas vanno inclusi nelle misure pilota.
@@ -36,8 +39,9 @@ La selezione avviene lato server; nessun `SELECT *` indiscriminato, `toPandas()`
 dei 10 milioni di record. Le proiezioni esterne sono esplicite; un eventuale `eligible.*`
 interno appartiene soltanto alla subquery già proiettata sul contratto.
 L'export validato può essere memorizzato in una cache privata immutabile fuori Git;
-questa prima versione non implementa una cache persistente e rilegge la selezione a ogni
-invocazione reale esplicita. Non programmare training ripetuti prima di introdurla.
+il percorso `--cache-directory` ora rilegge una cache privata immutabile già acquisita,
+   verificando checksum, versione, confini, seed, hash e SHA del codice di export/training.
+   Senza cache si esegue un nuovo export esplicito; non pianificare training ripetuti sul TEST.
 
 ## Piano privato CLI
 
