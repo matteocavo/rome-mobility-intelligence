@@ -9,6 +9,7 @@ import sqlglot
 from sqlglot import exp
 
 from app.core.config import Settings
+from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 
 
 class DataAccessError(RuntimeError):
@@ -65,10 +66,14 @@ class DatabricksClient:
             [
                 cfg.databricks_server_hostname,
                 cfg.databricks_http_path,
-                cfg.databricks_token.get_secret_value(),
+                cfg.databricks_client_id,
             ]
         ):
             raise DataAccessError("Databricks connection configuration is incomplete")
+        try:
+            credentials = WorkloadCredentials(cfg)
+        except WorkloadAuthenticationError as error:
+            raise DataAccessError(str(error)) from None
         connect = self._connect
         if connect is None:
             from databricks import sql
@@ -80,12 +85,18 @@ class DatabricksClient:
                     connect(
                         server_hostname=cfg.databricks_server_hostname,
                         http_path=cfg.databricks_http_path,
-                        access_token=cfg.databricks_token.get_secret_value(),
+                        credentials_provider=credentials,
                         use_inline_params=False,
                     )
                 ) as connection,
                 closing(connection.cursor()) as cursor,
             ):
+                cursor.execute("SELECT current_user() AS workload_identity")
+                identity = cursor.fetchone()
+                if identity is None or identity[0] != cfg.databricks_client_id:
+                    raise DataAccessError(
+                        "SQL session does not match the configured workload identity"
+                    )
                 cursor.execute(query, parameters=parameters or {})
                 columns = [x[0] for x in cursor.description]
                 chunks = []
@@ -107,7 +118,7 @@ class DatabricksClient:
                     if chunks
                     else pd.DataFrame(columns=columns)
                 )
-        except ExportBudgetError:
+        except DataAccessError:
             raise
         except Exception:
             # Connector exceptions can contain SQL, hostnames and credentials.

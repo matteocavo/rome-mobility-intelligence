@@ -44,7 +44,8 @@ Copy-Item .env.example .env
 
 `.env.example` contiene solo placeholder; `.env`, export e artifact runtime sono ignorati.
 Configurare le variabili `DATABRICKS_SERVER_HOSTNAME`, `DATABRICKS_HTTP_PATH`,
-`DATABRICKS_TOKEN`, `DATABRICKS_CATALOG`, `DATABRICKS_SCHEMA`, `TRAINING_TABLE`,
+`DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET` oppure `DATABRICKS_CREDENTIAL_TARGET`,
+`DATABRICKS_CATALOG`, `DATABRICKS_SCHEMA`, `TRAINING_TABLE`,
 `INFERENCE_TABLE`, `MODEL_ARTIFACT_PATH`, `ENVIRONMENT`. Nessun segreto nei log o in Git.
 Lasciare `MODEL_ARTIFACT_PATH` vuoto per la modalità skeleton.
 
@@ -128,3 +129,11 @@ python -m uvicorn app.main:app
 Il clone Git non include il modello. Con artifact non configurato resta la modalità skeleton.
 Non rilanciare il training sullo stesso TEST per ottimizzarlo. Il training effettivo usa il commit
 `f9dbf187185a2c9426970b42f2dfa9748615f45d`; le modifiche documentali successive non riaddestrano il modello.
+
+## Identità Databricks separata
+
+Il canale applicativo usa OAuth M2M di un service principal con scope `sql`, senza fallback
+al profilo CLI personale o a `DATABRICKS_TOKEN`. Il secret locale è nel Credential Manager
+Windows; `.env` contiene soltanto client ID, endpoint e nome della voce protetta.
+Ogni connessione verifica `current_user()` contro il client ID configurato prima della query.
+Permessi runtime e verifiche: [workload identity](docs/WORKLOAD_IDENTITY.md).

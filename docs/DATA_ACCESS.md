@@ -72,6 +72,9 @@ Verifica conteggio, grain, hash, sequenza fermata successiva, unica lineage/prep
 timestamp non futuri e age di feed/preparazione. Nessun fallback a una versione/epoca
 precedente. Il servizio non pianifica inference e non scrive prediction.
 
-`DATABRICKS_TOKEN` è un SecretStr privato nell'environment; l'esempio contiene placeholder.
-Rinnovo autenticazione, quota Free, disponibilità warehouse, autenticazione API e deploy
-rimangono verifiche successive. I test usano mock/fixture senza credenziali.
+OAuth M2M ora usa `DATABRICKS_CLIENT_ID` e una sola fonte del secret: environment privato
+`DATABRICKS_CLIENT_SECRET` oppure Credential Manager Windows tramite `DATABRICKS_CREDENTIAL_TARGET`.
+`DATABRICKS_TOKEN` è rifiutato; nessun fallback al profilo CLI personale. Il token SQL a breve durata
+è rinnovato in memoria; ogni connessione verifica l’identità prima delle SELECT.
+[Permessi e verifica runtime](WORKLOAD_IDENTITY.md). Quota Free, isolamento host, autenticazione API
+e deployment restano controlli separati. I test CI usano mock/fixture senza credenziali.

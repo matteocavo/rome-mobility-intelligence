@@ -59,3 +59,11 @@ autenticazione, scheduler, frontend, n8n, database prediction history o deploy c
 ModelService e gli endpoint metadata/readiness sono stati verificati con questo artifact
 in un’app ASGI locale. Nessun serving pubblico o scheduler inference abilitato.
 Il modello e la cache rimangono fuori Git; Databricks e il repository core sono rimasti invariati.
+
+## Confine identità
+
+Databricks SQL è autenticato con identità workload dedicata e permessi read-only sui
+due dataset necessari. [Configurazione e prove](WORKLOAD_IDENTITY.md). Il precedente training
+reale resta un evento storico eseguito prima di questa separazione; non viene ripetuto.
+Prima di un deploy pubblico separare anche account OS/runtime, in modo che un processo
+compromesso non possa leggere il profilo o il credential store personale dell’operatore.
