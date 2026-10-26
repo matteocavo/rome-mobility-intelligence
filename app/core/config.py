@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     training_table: str = "next_stop_delay_labeled"
     inference_table: str = "next_stop_delay_scoring"
     model_artifact_path: Path | None = None
+    model_artifact_root: Path | None = None
+    model_artifact_manifest_sha256: str = ""
+    databricks_query_timeout_seconds: float = Field(default=120, ge=0.05, le=600)
+    databricks_queue_timeout_seconds: float = Field(default=1, ge=0, le=10)
+    databricks_max_concurrent_queries: int = Field(default=1, ge=1, le=4)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

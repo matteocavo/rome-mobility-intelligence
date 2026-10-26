@@ -4,8 +4,12 @@ from app.ml.artifacts import load, probabilities
 
 
 class ModelService:
-    def __init__(self, artifact_path: Path):
-        self.pipeline, self.metadata = load(artifact_path)
+    def __init__(self, artifact_path: Path, *, trusted_root: Path, expected_manifest_sha256: str):
+        self.pipeline, self.metadata = load(
+            artifact_path,
+            trusted_root=trusted_root,
+            expected_manifest_sha256=expected_manifest_sha256,
+        )
 
     @property
     def threshold(self) -> float:

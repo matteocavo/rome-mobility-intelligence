@@ -19,7 +19,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.initialized = False
         if cfg.model_artifact_path:
             try:
-                app.state.model = ModelService(cfg.model_artifact_path)
+                app.state.model = ModelService(
+                    cfg.model_artifact_path,
+                    trusted_root=cfg.model_artifact_root,
+                    expected_manifest_sha256=cfg.model_artifact_manifest_sha256,
+                )
             except Exception:
                 app.state.model_error = True
         app.state.initialized = True

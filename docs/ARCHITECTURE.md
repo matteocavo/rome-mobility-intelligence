@@ -67,3 +67,10 @@ due dataset necessari. [Configurazione e prove](WORKLOAD_IDENTITY.md). Il preced
 reale resta un evento storico eseguito prima di questa separazione; non viene ripetuto.
 Prima di un deploy pubblico separare anche account OS/runtime, in modo che un processo
 compromesso non possa leggere il profilo o il credential store personale dell’operatore.
+
+## Artifact e query
+
+Il serving usa soltanto artifact approvati con digest esterno, root fidata e byte verificati
+prima della deserializzazione. Query ammesse entro deadline, cap righe e concorrenza per processo.
+[Disegno e prove](RUNTIME_SECURITY.md). La protezione non sostituisce isolamento OS, auth API
+o rate limiting di un futuro deployment pubblico.

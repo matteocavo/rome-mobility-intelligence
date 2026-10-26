@@ -11,7 +11,7 @@ from app.ml.artifacts import load, probabilities
 from app.services.model_service import ModelService
 
 
-def test_roundtrip_new_python_process(bundle, frame, trained, tmp_path):
+def test_roundtrip_new_python_process(bundle, bundle_trust, frame, trained, tmp_path):
     features = frame.iloc[:12][list(FEATURES)].copy()
     features["route_id"] = "new-route-after-reload"
     features["agency_id"] = None
@@ -21,11 +21,22 @@ def test_roundtrip_new_python_process(bundle, frame, trained, tmp_path):
     code = (
         "import json,sys,pandas as pd; from pathlib import Path; "
         "from app.ml.artifacts import load,probabilities; "
-        "m,_=load(Path(sys.argv[1])); x=pd.read_json(sys.argv[2],orient='split'); "
+        "m,_=load(Path(sys.argv[1]),trusted_root=Path(sys.argv[4]),"
+        "expected_manifest_sha256=sys.argv[5]); "
+        "x=pd.read_json(sys.argv[2],orient='split'); "
         "Path(sys.argv[3]).write_text(json.dumps(probabilities(m,x).tolist()))"
     )
     subprocess.run(
-        [sys.executable, "-c", code, str(bundle), str(input_path), str(output_path)],
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(bundle),
+            str(input_path),
+            str(output_path),
+            str(bundle_trust["trusted_root"]),
+            bundle_trust["expected_manifest_sha256"],
+        ],
         check=True,
         env={**os.environ, "OMP_NUM_THREADS": "1"},
     )
@@ -34,23 +45,23 @@ def test_roundtrip_new_python_process(bundle, frame, trained, tmp_path):
     )
 
 
-def test_artifact_metadata_and_saved_threshold(bundle, frame):
-    service = ModelService(bundle)
+def test_artifact_metadata_and_saved_threshold(bundle, bundle_trust, frame):
+    service = ModelService(bundle, **bundle_trust)
     p = service.predict_proba(frame[list(FEATURES)])
     np.testing.assert_array_equal(service.predict(frame[list(FEATURES)]), p >= service.threshold)
     assert service.info()["synthetic"] is True
 
 
 @pytest.mark.parametrize("file", ["pipeline.joblib", "metadata.json", "contract.json"])
-def test_corrupt_bundle_rejected(bundle, file):
+def test_corrupt_bundle_rejected(bundle, bundle_trust, file):
     with (bundle / file).open("ab") as stream:
         stream.write(b"corruption")
     with pytest.raises(ValueError, match="checksum"):
-        load(bundle)
+        load(bundle, **bundle_trust)
 
 
 @pytest.mark.parametrize("change", ["threshold", "hash", "version"])
-def test_semantic_metadata_validation_after_checksum(bundle, change):
+def test_semantic_metadata_validation_after_checksum(bundle, bundle_trust, change):
     import hashlib
 
     data = json.loads((bundle / "metadata.json").read_text())
@@ -64,13 +75,25 @@ def test_semantic_metadata_validation_after_checksum(bundle, change):
     manifest = json.loads((bundle / "checksums.json").read_text())
     manifest["metadata.json"] = hashlib.sha256((bundle / "metadata.json").read_bytes()).hexdigest()
     (bundle / "checksums.json").write_text(json.dumps(manifest))
+    bundle_trust["expected_manifest_sha256"] = hashlib.sha256(
+        (bundle / "checksums.json").read_bytes()
+    ).hexdigest()
     with pytest.raises(ValueError):
-        load(bundle)
+        load(bundle, **bundle_trust)
 
 
-def test_validation_cli_smoke_and_invalid_exit(bundle, tmp_path):
+def test_validation_cli_smoke_and_invalid_exit(bundle, bundle_trust, tmp_path):
     result = subprocess.run(
-        [sys.executable, "-m", "scripts.validate_model_artifact", str(bundle)],
+        [
+            sys.executable,
+            "-m",
+            "scripts.validate_model_artifact",
+            str(bundle),
+            "--trusted-root",
+            str(bundle_trust["trusted_root"]),
+            "--expected-manifest-sha256",
+            bundle_trust["expected_manifest_sha256"],
+        ],
         capture_output=True,
         text=True,
         env={**os.environ, "OMP_NUM_THREADS": "1"},
