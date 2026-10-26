@@ -83,3 +83,23 @@ def test_validation_cli_smoke_and_invalid_exit(bundle, tmp_path):
         text=True,
     )
     assert failure.returncode != 0
+
+
+def test_candidate_comparison_and_threshold_metadata_serialization(trained):
+    from app.contracts.schemas import ArtifactMetadata
+
+    _, metadata = trained
+    restored = ArtifactMetadata.model_validate_json(metadata.model_dump_json())
+    assert restored.candidate_validation == metadata.candidate_validation
+    for row in restored.threshold_grid:
+        assert {
+            "threshold",
+            "precision",
+            "recall",
+            "f1",
+            "predicted_positive_rate",
+            "tp",
+            "fp",
+            "tn",
+            "fn",
+        } == set(row)

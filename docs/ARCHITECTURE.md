@@ -52,3 +52,10 @@ Fonti upstream fissate:
 
 Stati storici nelle sezioni Spark non diventano impostazioni operative sklearn. Nessuna
 autenticazione, scheduler, frontend, n8n, database prediction history o deploy cloud in questa fase.
+
+## Stato dopo il primo training reale
+
+È disponibile localmente il primo bundle sklearn reale validato; [evidenze](REAL_MODEL_EVALUATION.md).
+ModelService e gli endpoint metadata/readiness sono stati verificati con questo artifact
+in un’app ASGI locale. Nessun serving pubblico o scheduler inference abilitato.
+Il modello e la cache rimangono fuori Git; Databricks e il repository core sono rimasti invariati.

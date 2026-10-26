@@ -39,8 +39,8 @@ Le capacità reali e la copertura delle categorie devono comunque essere misurat
 
 ## Soglia e metriche
 
-Grid di soglie 0.05-0.95, passo 0.05, applicata **solo sul validation set**. Per ogni soglia:
-precision, recall, F1. Criterio candidato: massimo F1, poi precision, poi soglia più alta.
+Grid di soglie 0.05-0.95, passo 0.025, applicata **solo sul validation set**. Per ogni soglia:
+precision, recall, F1, predicted positive rate e TP/FP/TN/FN. Criterio candidato: massimo F1, poi precision, poi soglia più alta.
 La soglia Spark storica non è copiata. Regola sklearn documentata: **p >= soglia salvata**.
 Per uso reale il criterio operativo può richiedere costi/recall minimo prima di congelare
 il protocollo; la scelta corrente è una baseline dichiarata.
@@ -66,3 +66,14 @@ Il test obbligatorio salva la pipeline, avvia un **nuovo processo Python**, rica
 confronta `predict_proba` con `rtol=atol=1e-12`, incluse categorie nuove e NULL.
 `validate_model_artifact` valida metadata/hash/soglia ed esegue uno smoke sintetico;
 un errore produce exit code non zero. Non dimostra qualità sui dati reali.
+
+## Prima esecuzione reale
+
+Completata il 26 ottobre: [dataset, split, campionamento, risultati e artifact](REAL_MODEL_EVALUATION.md).
+Un campionamento uniforme della valutazione è ora disponibile solo tramite opt-in esplicito
+`evaluation_sample=true`; il default continua a rifiutare set completi oltre budget.
+Il ranking usa soltanto hash della chiave, seed e tie-break, senza classe; la prevalenza
+osservata è riportata rispetto alla popolazione e non è bilanciata artificialmente.
+La selezione viene salvata prima del TEST con `freeze_selection`; un gate esistente non si sovrascrive.
+`--cache-directory` riusa un export locale fidato dopo verifica di checksum e protocollo, senza
+nuove query. Dati e cache non sono inclusi in Git.
