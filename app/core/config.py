@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     databricks_server_hostname: str = ""
     databricks_http_path: str = ""
     databricks_token: SecretStr = SecretStr("")
+    databricks_client_id: str = ""
+    databricks_client_secret: SecretStr = SecretStr("")
+    databricks_credential_target: str = ""
     databricks_catalog: str = "rome_transport"
     databricks_schema: str = "features"
     training_table: str = "next_stop_delay_labeled"
