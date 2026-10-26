@@ -87,6 +87,7 @@ class TrainingRepository:
         evaluation_budget: int,
         max_bytes: int,
         seed: int,
+        evaluation_sample: bool = False,
     ) -> tuple[dict[str, pd.DataFrame], dict]:
         if type(version) is not int or version != CONTRACT["training"]["validated_version"]:
             raise ValueError("Only explicitly validated labeled v12 supported; no fallback")
@@ -132,6 +133,8 @@ class TrainingRepository:
                 f"SELECT count(*) AS total, "
                 f"count_if(NOT coalesce(({valid}), false)) AS rejected, "
                 "count_if(label_source_feed_timestamp >= :cutoff) AS purged "
+                f", count_if(label_source_feed_timestamp < :cutoff AND `{LABEL}`=1) "
+                "AS eligible_positives "
                 f"FROM ({base}) AS population",
                 params,
                 max_rows=1,
@@ -148,10 +151,20 @@ class TrainingRepository:
             if int(duplicate.duplicate_groups):
                 raise ValueError("Duplicate source grain; export blocked")
             count = int(audit.total) - int(audit.purged)
+            sampled_evaluation = name != "train" and count > evaluation_budget
             if name != "train":
-                if count > evaluation_budget:
+                if sampled_evaluation and not evaluation_sample:
                     raise ValueError("Full natural-prevalence evaluation exceeds measured budget")
                 query = eligible
+                if sampled_evaluation:
+                    params.update(
+                        evaluation_seed=seed + (1 if name == "validation" else 2),
+                        evaluation_limit=evaluation_budget,
+                    )
+                    query += (
+                        f" ORDER BY xxhash64({keys}, :evaluation_seed), {keys} "
+                        "LIMIT :evaluation_limit"
+                    )
                 limit = evaluation_budget
             elif count <= train_budget:
                 query, limit = eligible, train_budget
@@ -182,7 +195,8 @@ class TrainingRepository:
             frame = self.client.select(query, params, max_rows=limit, max_bytes=max_bytes)
             validate_labeled(frame)
             if name != "train" or count <= train_budget:
-                if len(frame) != count:
+                expected_count = min(count, evaluation_budget) if name != "train" else count
+                if len(frame) != expected_count:
                     raise ValueError("Incomplete export")
                 frame["sample_weight"] = 1.0
             else:
@@ -205,12 +219,24 @@ class TrainingRepository:
                 "purged_rows": int(audit.purged),
                 "unexpected_rejected_rows": 0,
                 "eligible_rows": count,
+                "eligible_positives": int(audit.eligible_positives)
+                if "eligible_positives" in audit
+                else None,
                 "exported_rows": len(frame),
                 "positive_rate": float(frame[LABEL].mean()),
+                "snapshots": int(frame.feed_timestamp.nunique()),
+                "min_feed": int(frame.feed_timestamp.min()),
+                "max_feed": int(frame.feed_timestamp.max()),
                 "selected_keys_sha256": checksum,
                 "query": query,
                 "parameters": params,
                 "inclusion_weights": "stratum_n/stratum_quota" if "stratum_n" in frame else "1",
+                "evaluation_sampling": (
+                    "uniform full-grain hash rank, independent of label"
+                    if sampled_evaluation
+                    else "none"
+                ),
+                "evaluation_inclusion_probability": len(frame) / count if name != "train" else None,
             }
             if "stratum_n" in frame:
                 allocation = stats.copy()

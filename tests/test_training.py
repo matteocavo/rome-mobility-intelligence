@@ -46,7 +46,53 @@ def test_threshold_is_selected_on_validation():
     threshold, grid = select_threshold([0, 0, 1, 1], [0.1, 0.2, 0.7, 0.8], [0.15, 0.5, 0.75])
     assert threshold == 0.5
     assert len(grid) == 3
-    assert set(grid[0]) == {"threshold", "precision", "recall", "f1"}
+    assert set(grid[0]) == {
+        "threshold",
+        "precision",
+        "recall",
+        "f1",
+        "predicted_positive_rate",
+        "tp",
+        "fp",
+        "tn",
+        "fn",
+    }
+
+
+def test_threshold_grid_includes_business_range_and_counts():
+    _, rows = select_threshold([0, 0, 1, 1], [0.1, 0.2, 0.7, 0.8])
+    thresholds = {row["threshold"] for row in rows}
+    assert {0.2, 0.45, 0.8}.issubset(thresholds)
+    for row in rows:
+        assert row["tp"] + row["tn"] + row["fp"] + row["fn"] == 4
+        assert row["predicted_positive_rate"] == (row["tp"] + row["fp"]) / 4
+
+
+def test_freeze_callback_precedes_test_prediction(frame, monkeypatch):
+    from app.ml import training as module
+
+    events = []
+    original = module.evaluate
+
+    def observe(y, p, threshold):
+        events.append("evaluation")
+        return original(y, p, threshold)
+
+    monkeypatch.setattr(module, "evaluate", observe)
+
+    def freeze(pipeline, selection):
+        events.append("freeze")
+        assert selection["selected_candidate"] in selection["candidate_validation"]
+        assert pipeline.classes_.tolist() == [0, 1]
+
+    train(
+        temporal_split(frame, FIXTURE_PLAN),
+        reference={"temporal_plan": asdict(FIXTURE_PLAN)},
+        code_sha="fixture-test",
+        synthetic=True,
+        freeze_callback=freeze,
+    )
+    assert events[-2:] == ["freeze", "evaluation"]
 
 
 def test_training_candidates_and_test_isolation(frame, trained):

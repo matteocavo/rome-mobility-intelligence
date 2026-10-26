@@ -18,7 +18,7 @@ class ModelService:
         return (self.predict_proba(features) >= self.threshold).astype(int)
 
     def info(self):
-        return self.metadata.model_dump(
+        result = self.metadata.model_dump(
             include={
                 "model_type",
                 "trained_at",
@@ -29,5 +29,31 @@ class ModelService:
                 "validation_metrics",
                 "test_metrics",
                 "synthetic",
+                "training_data_reference",
             }
         )
+        reference = self.metadata.training_data_reference
+        result["training_data_reference"] = {
+            key: reference[key]
+            for key in (
+                "source",
+                "table",
+                "version",
+                "feature_contract_hash",
+                "temporal_plan",
+                "seed",
+                "sampling_algorithm",
+                "selected_candidate",
+                "evaluation_status",
+            )
+            if key in reference
+        }
+        result["training_data_reference"]["partitions"] = {
+            name: {
+                key: value
+                for key, value in entry.items()
+                if key not in {"query", "parameters", "strata_allocation"}
+            }
+            for name, entry in reference.get("partitions", {}).items()
+        }
+        return result

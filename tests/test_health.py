@@ -29,6 +29,7 @@ def test_model_info_and_loaded_readiness(bundle):
         assert data["synthetic"] is True
         assert 0 < data["threshold"] < 1
         assert "validation_metrics" in data and "test_metrics" in data
+        assert "training_data_reference" in data
 
 
 def test_empty_artifact_environment_is_skeleton(monkeypatch):
