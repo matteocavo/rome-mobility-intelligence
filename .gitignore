@@ -17,5 +17,6 @@ data_exports/
 *.parquet
 *.arrow
 *.code-workspace
+.vscode/
 .coverage
 htmlcov/
