@@ -51,7 +51,8 @@ Fonti upstream fissate:
 - [Roadmap](https://github.com/matteocavo/rome-public-transport-reliability/blob/7d263629b533f57af46ffaadcb56e4fcc0f296a7/docs/ROADMAP.md)
 
 Stati storici nelle sezioni Spark non diventano impostazioni operative sklearn. Nessuna
-autenticazione, scheduler, frontend, n8n, database prediction history o deploy cloud in questa fase.
+autenticazione, scheduler, frontend, n8n o deploy cloud in questa fase. La prediction history
+PostgreSQL è ora un componente opzionale, disabilitato di default.
 
 ## Stato dopo il primo training reale
 
@@ -82,4 +83,13 @@ il ModelService trusted già caricato; il lock serializza predict_proba e la thr
 dai metadata. /predictions/current usa CurrentScoringRepository con tabella fissa, ultimo
 feed_timestamp, lineage verificata e ordinamento deterministico. Identificativi operativi
 restano separati dall'input modello e il ritardo osservato è distinto dalla prediction next stop.
-Nessuna history o scrittura; [contratto API e confini](INFERENCE_API.md).
+Questi endpoint preview non scrivono history; [contratto API e confini](INFERENCE_API.md).
+
+## Persistence applicativa opzionale
+
+Databricks rimane sorgente read-only; CurrentScoringService riusa il contract e ModelService
+per preview e BatchScoringService. Solo il trigger manuale abilitato esplicitamente scrive in
+PostgreSQL tramite PredictionHistoryRepository. Database gestisce engine/pool/sessioni,
+models definisce lo schema e Alembic applica le migrazioni fuori dal runtime HTTP.
+La history API legge soltanto PostgreSQL, con filtri e range bounded. Nessun SQL business nelle
+route, salvataggio implicito, scheduler, frontend o n8n. [Disegno e limiti](PREDICTION_HISTORY.md).

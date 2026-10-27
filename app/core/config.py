@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     databricks_max_concurrent_queries: int = Field(default=1, ge=1, le=4)
     inference_max_batch_rows: int = Field(default=100, ge=1, le=100)
     inference_max_bytes: int = Field(default=8_000_000, ge=1024, le=64_000_000)
+    database_url: SecretStr = SecretStr("")
+    enable_prediction_persistence: bool = False
+    database_pool_size: int = Field(default=2, ge=1, le=4)
+    database_pool_timeout_seconds: int = Field(default=3, ge=1, le=10)
+    database_connect_timeout_seconds: int = Field(default=5, ge=1, le=15)
+    database_statement_timeout_ms: int = Field(default=5000, ge=100, le=30000)
+    history_max_rows: int = Field(default=200, ge=1, le=200)
+    history_max_range_days: int = Field(default=7, ge=1, le=7)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

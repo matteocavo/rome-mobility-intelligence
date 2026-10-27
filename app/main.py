@@ -4,11 +4,13 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health, inference, model
+from app.api.routes import health, history, inference, model
 from app.core.config import Settings
 from app.core.logging import configure_logging
 from app.data.current_repository import CurrentScoringRepository
 from app.data.databricks_client import DatabricksClient
+from app.persistence.database import Database
+from app.persistence.history_repository import PredictionHistoryRepository
 from app.services.model_service import ModelService
 
 
@@ -20,6 +22,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         configure_logging()
         app.state.settings = cfg
         app.state.current_repository = CurrentScoringRepository(DatabricksClient(cfg), cfg)
+        app.state.database = Database(cfg)
+        app.state.history_repository = PredictionHistoryRepository(app.state.database, cfg)
         app.state.model = None
         app.state.model_error = False
         app.state.initialized = False
@@ -33,13 +37,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except Exception:
                 app.state.model_error = True
         app.state.initialized = True
-        yield
-        app.state.initialized = False
+        try:
+            yield
+        finally:
+            app.state.database.dispose()
+            app.state.initialized = False
 
     application = FastAPI(title="Rome Mobility Intelligence", version="0.1.0", lifespan=lifespan)
     application.include_router(health.router)
     application.include_router(model.router)
     application.include_router(inference.router)
+    application.include_router(history.router)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):

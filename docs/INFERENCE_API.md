@@ -1,5 +1,11 @@
 # Operational inference API
 
+Estensione opzionale: [prediction history PostgreSQL](PREDICTION_HISTORY.md).
+POST /predictions/current/persist è un trigger manuale esplicitamente abilitato, disabilitato
+di default; GET /predictions/history è read-only con range/limit bounded. Gli endpoint preview
+descritti sotto restano stateless e non salvano automaticamente righe. Le affermazioni sotto
+sull'assenza di persistenza si riferiscono a questi endpoint e allo smoke iniziale della PR #14.
+
 Inference sklearn stateless locale. Public deployment is NOT yet approved.
 Il modello reale corrente è Weighted HistGradientBoostingClassifier, già addestrato:
 nessun training o aggiornamento del bundle in questa fase. La versione pubblica è il digest
@@ -90,8 +96,9 @@ retry limitati e cap righe server-side. `INFERENCE_MAX_BYTES=8000000` limita il 
 Cancellation request non garantisce terminazione remota immediata. LIMIT non limita i byte
 scansionati dal server. Un deployment con più processi richiede un gate distribuito.
 
-Nessuna persistenza di righe o prediction, cron, history, training, frontend, n8n o scrittura
-Databricks. Nessuna autenticazione API o difesa per esposizione Internet viene dichiarata.
+Questi endpoint preview non persistono righe o prediction. Il trigger history è separato e
+opt-in. Nessun cron, training, frontend, n8n o scrittura Databricks. Nessuna autenticazione API
+o difesa per esposizione Internet viene dichiarata.
 Prima del deploy pubblico serve un account OS separato, senza ownership di storage/config
 modello e senza accesso al credential store personale. Tale isolamento non è implementato qui.
 

@@ -1,10 +1,8 @@
 """Stateless operational inference. No client-controlled SQL or model settings."""
 
 import logging
-from datetime import datetime, timezone
 from typing import Annotated
 
-import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -15,8 +13,8 @@ from app.contracts.inference import (
     PredictionResponse,
     PredictRequest,
 )
-from app.contracts.operational_ml import FEATURES
 from app.data.databricks_client import DataAccessError, QueryTimeoutError
+from app.services.current_scoring import CurrentScoringService
 from app.services.model_service import ModelService
 
 router = APIRouter()
@@ -31,7 +29,7 @@ ERRORS = {
 
 
 def operational_model(request: Request):
-    if request.method == "POST" and request.query_params:
+    if request.url.path in {"/predict", "/predict/batch"} and request.query_params:
         raise HTTPException(422, "Prediction endpoints do not accept query parameters")
     model = request.app.state.model
     test_mode = request.app.state.settings.environment == "test"
@@ -115,51 +113,20 @@ def current(
     model: Annotated[ModelService, Depends(operational_model)],
 ):
     try:
-        frame = request.app.state.current_repository.latest(query.limit)
+        return (
+            CurrentScoringService(request.app.state.current_repository, model)
+            .score(query.limit)
+            .response
+        )
     except QueryTimeoutError:
         logger.warning("current_scoring_deadline")
         raise HTTPException(504, "Scoring query deadline exceeded") from None
     except DataAccessError:
         logger.warning("current_scoring_unavailable")
         raise HTTPException(503, "Scoring source temporarily unavailable") from None
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, KeyError):
         logger.warning("current_scoring_contract_rejected")
         raise HTTPException(422, "Current scoring snapshot is invalid") from None
     except Exception:
         logger.error("current_scoring_unavailable")
         raise HTTPException(503, "Scoring source temporarily unavailable") from None
-    try:
-        if frame.empty or len(frame) > query.limit:
-            raise ValueError("Invalid snapshot size")
-        rows = frame[list(FEATURES)].to_dict("records")
-        rows = [
-            PredictRequest.model_validate(
-                {k: None if pd.isna(v) else v for k, v in row.items()}
-            ).model_dump()
-            for row in rows
-        ]
-        watermark = datetime.fromtimestamp(int(frame.feed_timestamp.iloc[0]), timezone.utc)
-        if watermark > datetime.now(timezone.utc):
-            raise ValueError("Future watermark")
-    except (ValueError, TypeError, KeyError, OverflowError):
-        raise HTTPException(422, "Current scoring feature contract is invalid") from None
-    predictions = infer(model, rows)
-    generated = datetime.now(timezone.utc)
-    for result, (_, source) in zip(predictions, frame.iterrows(), strict=True):
-        for name in ("route_id", "trip_id", "vehicle_id", "stop_id"):
-            value = source.get(name)
-            result[name] = None if pd.isna(value) else str(value)
-        delay = source.get("current_arrival_delay_seconds")
-        result.update(
-            feed_timestamp=int(source.feed_timestamp),
-            threshold=model.threshold,
-            current_arrival_delay_seconds=None if pd.isna(delay) else float(delay),
-        )
-    return {
-        **model.identity(),
-        "source_watermark": watermark,
-        "prediction_generated_at": generated,
-        "source_age_seconds": (generated - watermark).total_seconds(),
-        "rows": len(predictions),
-        "predictions": predictions,
-    }
