@@ -28,7 +28,7 @@ def validate(workflow: dict):
     encoded = json.dumps(workflow)
     check(
         not re.search(
-            r"(?i)password|token|secret|authorization|bearer |credential|databricks|postgres|"
+            r"(?i)password|token|secret|authorization|bearer |databricks|postgres|"
             r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|(?<![A-Za-z])[A-Z]:\\|postgresql://",
             encoded,
         ),
@@ -38,6 +38,7 @@ def validate(workflow: dict):
         not re.search(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", encoded, re.I),
         "Unexpected account/credential UUID",
     )
+    check(all("credentials" not in n for n in workflow["nodes"]), "No credential IDs in export")
     names = {n["name"] for n in workflow["nodes"]}
     check(len(names) == len(workflow["nodes"]), "Duplicate node names")
     check(all(n["type"] in ALLOWED for n in workflow["nodes"]), "Forbidden execution/source node")
@@ -69,10 +70,19 @@ def validate(workflow: dict):
                     "sendBody",
                     "sendHeaders",
                     "headerParameters",
-                    "authentication",
                 )
             ),
             "No body/auth input",
+        )
+        check(
+            params.get("authentication") == "genericCredentialType"
+            and params.get("genericAuthType") == "httpHeaderAuth"
+            and "credentials" not in node,
+            "Service Header Auth must be bound manually; no credential IDs in export",
+        )
+        check(
+            "X-RMI-Service-Key" in node.get("notes", ""),
+            "Required service header must be documented",
         )
         check(node.get("retryOnFail") is False, "Built-in indiscriminate retries forbidden")
         check(

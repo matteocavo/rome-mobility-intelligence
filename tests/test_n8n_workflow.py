@@ -18,6 +18,20 @@ def test_sanitized_artifact_policy(workflow):
     validate(workflow)
 
 
+def test_service_header_auth_required_without_exported_credential_ids(workflow):
+    requests = [n for n in workflow["nodes"] if n["type"].endswith(".httpRequest")]
+    assert all(
+        n["parameters"]["authentication"] == "genericCredentialType"
+        and n["parameters"]["genericAuthType"] == "httpHeaderAuth"
+        and "X-RMI-Service-Key" in n["notes"]
+        and "credentials" not in n
+        for n in requests
+    )
+    requests[0]["parameters"]["authentication"] = "none"
+    with pytest.raises(ValueError):
+        validate(workflow)
+
+
 @pytest.mark.parametrize(
     "change", ["active", "secret", "token", "code", "source", "credentials", "cycle"]
 )

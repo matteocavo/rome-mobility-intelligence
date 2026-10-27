@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     n8n_webhook_secret: SecretStr = SecretStr("")
     n8n_webhook_allowed_host: str = ""
     n8n_webhook_timeout_seconds: float = Field(default=5, ge=0.1, le=10)
+    n8n_service_api_key: SecretStr = SecretStr("")
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "::1", "testserver"]
+    cors_allowed_origins: list[str] = []
+    request_max_bytes: int = Field(default=262144, ge=1024, le=1048576)
+    rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
+    rate_limit_inference: int = Field(default=10, ge=1, le=1000)
+    rate_limit_write: int = Field(default=2, ge=1, le=1000)
+    rate_limit_read: int = Field(default=60, ge=1, le=1000)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

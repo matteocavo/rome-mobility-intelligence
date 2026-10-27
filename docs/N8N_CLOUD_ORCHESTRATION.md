@@ -1,5 +1,15 @@
 # n8n Cloud orchestration
 
+## FastAPI service authentication
+
+All HTTP Request nodes require Generic Credential Type → Header Auth, configured manually
+with Name=`X-RMI-Service-Key`, Value from the private backend `N8N_SERVICE_API_KEY`.
+No credential ID/value is exported. Missing binding must be resolved before execution.
+This inbound API key is distinct from the outbound webhook secret below; reuse is rejected.
+Operational endpoints and full /ready require service auth. Anonymous /ready is reduced and
+cannot satisfy the workflow guard. Never give the service credential to the frontend.
+[Production configuration and remaining HTTPS gate](SECURE_DEPLOYMENT.md).
+
 Target workspace: `m-cavo.app.n8n.cloud`. The operator imports/configures workflows manually.
 This implementation does not access the account and never asks for an administrative API key.
 There are no n8n Admin API calls, Docker Compose files, global npm installs or local n8n service.
@@ -67,8 +77,8 @@ workflow actions; the workflow then rejects extra payload fields and malformed i
    It is empty by default and the graph rejects missing, local or placeholder destinations
    before any HTTP call. This Set-node configuration works without plan-dependent Cloud variables.
 4. Do not publish the schedule. Confirm the 15-minute interval and Europe/Rome timezone.
-   Configure backend authentication separately in the HTTP nodes when the secure deployment
-   provides it; never use the n8n administrative key or reuse the webhook secret as backend auth.
+   Bind the dedicated API Header Auth credential to every HTTP node before execution;
+   never use the n8n administrative key or reuse the webhook secret as backend auth.
 5. Create/import a second workflow using
    [rome_mobility_webhook_boundary.json](../ops/n8n/workflows/rome_mobility_webhook_boundary.json).
 6. In its Webhook node, keep Authentication=Header Auth. Create/select a **Header Auth**

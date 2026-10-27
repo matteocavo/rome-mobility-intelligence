@@ -1,5 +1,10 @@
 # Application prediction history
 
+Current API policy: persist and history require X-RMI-Service-Key in every environment,
+in addition to the explicit persistence enable flag for writes. Repeating the local/manual
+smoke now requires that private header. Historical native validation below predates this
+new boundary. [Service auth and production requirements](SECURE_DEPLOYMENT.md).
+
 PostgreSQL is the application history store, separate from Databricks source data.
 SQLAlchemy 2.0 + psycopg 3 provide transactional access; Alembic owns schema changes.
 No schema is created or migrated at application startup. No public deployment is approved.

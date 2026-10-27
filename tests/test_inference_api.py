@@ -10,6 +10,7 @@ from app.contracts.operational_ml import FEATURES, HASH
 from app.core.config import Settings
 from app.data.databricks_client import DataAccessError, QueryTimeoutError
 from app.main import create_app
+from tests.conftest import SERVICE_KEY
 
 
 @pytest.fixture
@@ -25,12 +26,13 @@ def api(bundle, bundle_trust):
         Settings(
             _env_file=None,
             environment="test",
+            n8n_service_api_key=SERVICE_KEY,
             model_artifact_path=bundle,
             model_artifact_root=bundle_trust["trusted_root"],
             model_artifact_manifest_sha256=bundle_trust["expected_manifest_sha256"],
         )
     )
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-RMI-Service-Key": SERVICE_KEY}) as client:
         yield client
 
 

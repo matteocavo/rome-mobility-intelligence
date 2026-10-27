@@ -1,5 +1,15 @@
 # Runtime security: artifact trust e query budgets
 
+## HTTP e deployment
+
+X-RMI-Service-Key protegge tutte le route operative in ogni ambiente. N8N_SERVICE_API_KEY è
+SecretStr, minimo 32 caratteri, confronto timing-safe e distinto dal webhook secret.
+La readiness anonima è ridotta; nessun credential/host/path viene esposto. Auth precede il
+parsing, con body cap, budget globali bounded distinti inference/write/read e HTTP 429.
+CORS vuoto, Host allowlist, nessuna fiducia nei forwarded headers e log senza payload/query.
+Runtime production fail-closed, container non-root senza artifact/secret inclusi, un worker.
+Nessun deployment pubblico o Cloud smoke. [Dettagli e limiti](SECURE_DEPLOYMENT.md).
+
 ## Boundary n8n Cloud
 
 Nessuna API key amministrativa n8n entra nell'applicazione. N8nClient non accetta URL/payload

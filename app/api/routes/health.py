@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app.core.service_auth import SERVICE_HEADER, ServiceAuthError, verify_service_key
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 
 router = APIRouter()
@@ -15,6 +16,22 @@ def health():
 def ready(request: Request):
     state = request.app.state
     available = state.initialized and state.model is not None and not state.model_error
+    if (
+        state.model is not None
+        and state.model.metadata.synthetic
+        and state.settings.environment != "test"
+    ):
+        available = False
+    key = request.headers.get(SERVICE_HEADER)
+    if key is None:
+        return JSONResponse(
+            status_code=200 if available else 503,
+            content={"status": "ready" if available else "not_ready"},
+        )
+    try:
+        verify_service_key(state.settings, key)
+    except ServiceAuthError as error:
+        raise HTTPException(error.status, str(error)) from None
     try:
         WorkloadCredentials(state.settings)  # Configuration only: no OAuth or SQL traffic.
         identity_configured = True

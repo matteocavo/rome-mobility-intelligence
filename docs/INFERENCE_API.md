@@ -1,5 +1,10 @@
 # Operational inference API
 
+Tutti gli endpoint inference e /model/info richiedono ora `X-RMI-Service-Key`, anche in locale.
+La chiave di servizio non appartiene al frontend. Auth precede parsing/query; body cap e budget
+HTTP sono indipendenti dai limiti batch/SQL. /ready anonima espone solo status, quella con chiave
+espone i flag completi. [Policy corrente e futura auth pubblica](SECURE_DEPLOYMENT.md).
+
 Estensione opzionale: [prediction history PostgreSQL](PREDICTION_HISTORY.md).
 POST /predictions/current/persist è un trigger manuale esplicitamente abilitato, disabilitato
 di default; GET /predictions/history è read-only con range/limit bounded. Gli endpoint preview

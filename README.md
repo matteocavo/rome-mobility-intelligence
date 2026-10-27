@@ -123,6 +123,13 @@ Nessun deploy pubblico o tunnel è approvato o creato.
 
 ## Verifiche
 
+Le API operative richiedono `X-RMI-Service-Key`, configurata privatamente come
+`N8N_SERVICE_API_KEY` e distinta dal secret webhook. `/health` resta pubblica, `/ready` anonima
+è ridotta; i dettagli richiedono la chiave. Questa credenziale non va al frontend.
+[Deployment sicuro](docs/SECURE_DEPLOYMENT.md): auth, rate/body limits, CORS/host, immagine
+non-root senza modello incluso, un worker e requisiti HTTPS/secret manager.
+Nessun deployment pubblico è stato eseguito; la configurazione production è fail-closed.
+
 ```powershell
 python -m compileall -q app scripts tests
 pytest -q

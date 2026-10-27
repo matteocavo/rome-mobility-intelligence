@@ -40,3 +40,6 @@ def bundle_trust(bundle):
             (bundle / "checksums.json").read_bytes()
         ).hexdigest(),
     }
+
+
+SERVICE_KEY = "synthetic-service-key-only-for-tests-0000000000"
