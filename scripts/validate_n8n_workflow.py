@@ -1,4 +1,4 @@
-"""Validate sanitized Cloud n8n artifacts without importing n8n or connecting to services."""
+"""Validate inactive Community/Cloud-compatible n8n graphs without external calls."""
 
 import json
 import re
@@ -96,10 +96,10 @@ def validate(workflow: dict):
             response == {"fullResponse": True, "neverError": True, "responseFormat": "json"},
             "HTTP status must be available for selective retries",
         )
-    check(paths == expected and len(http_nodes) == 6, "Missing/unexpected HTTP attempts")
+    check(paths == expected and len(http_nodes) == 10, "Missing/unexpected HTTP attempts")
     settings = workflow["settings"]
     check(
-        settings["timezone"] == "Europe/Rome" and settings["executionTimeout"] == 600,
+        settings["timezone"] == "Europe/Rome" and settings["executionTimeout"] == 840,
         "Timezone/workflow deadline incorrect",
     )
     for key, value in {
@@ -111,13 +111,13 @@ def validate(workflow: dict):
         check(settings.get(key) == value, "Execution data retention must be disabled")
     schedule = next(n for n in workflow["nodes"] if n["type"].endswith(".scheduleTrigger"))
     check(
-        schedule["parameters"]["rule"]["interval"] == [{"field": "minutes", "minutesInterval": 15}],
-        "Schedule must be 15 minutes",
+        schedule["parameters"]["rule"]["interval"] == [{"field": "minutes", "minutesInterval": 30}],
+        "Schedule must be 30 minutes",
     )
     waits = sorted(
         n["parameters"]["amount"] for n in workflow["nodes"] if n["type"].endswith(".wait")
     )
-    check(waits == [30, 60], "Exactly two bounded backoffs required")
+    check(waits == [30, 30, 30, 45, 45, 60], "Bounded health/ready/write backoffs required")
     graph = workflow["connections"]
     for source, connections in graph.items():
         check(source in names, "Unknown graph source")
@@ -131,7 +131,7 @@ def validate(workflow: dict):
             for edge in output:
                 walk(edge["node"], stack | {name})
 
-    for start in ("Manual Trigger", "Schedule Every 15 Minutes"):
+    for start in ("Manual Trigger", "Schedule Every 30 Minutes"):
         walk(start, set())
     terminals = names - set(graph)
     for node in workflow["nodes"]:
@@ -186,7 +186,7 @@ def validate_boundary(workflow: dict):
 def main():
     validate(json.loads(WORKFLOW.read_text()))
     validate_boundary(json.loads(BOUNDARY.read_text()))
-    print("n8n Cloud artifact policy PASS; account import/runtime validation is separate")
+    print("n8n inactive artifact policy PASS; deployment and runtime validation are separate")
 
 
 if __name__ == "__main__":

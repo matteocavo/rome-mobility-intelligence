@@ -1,12 +1,15 @@
 # Secure backend deployment preparation
 
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](../ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
 ## Zero-cost candidate (supersedes provider-selection gaps below)
 
 P0 requires both 0 EUR/month mandatory recurring owner infrastructure cost and a meaningful
 low-code/no-code layer, primary orchestrator when technically sustainable.
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**.
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**.
 **GitHub Actions: zero-cost fallback scheduler**; opt-in only, never automatically enabled.
-n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+n8n: primary low-code integration; selected and prepared, not yet provisioned.
 A paid n8n Cloud subscription cannot be mandatory. No deployment is performed. [Zero-cost design, exact setup and remaining gates](ZERO_COST_DEPLOYMENT.md)
 selects Render Free + Neon Free and private build-time delivery via Dockerfile.zero-cost.
 The original Dockerfile remains the mount-based alternative. Build secrets never enter
@@ -138,7 +141,7 @@ installs reviewed binary wheels in a builder and runs as UID/GID 10001 with root
 No compiler is installed. Runtime versions match existing development pins, including numpy,
 pandas, scipy and sklearn. The deny-by-default [.dockerignore](../.dockerignore) admits only
 application code, pinned requirements and selected server scripts. It excludes models, local
-env/credential stores, source exports and DB data. No n8n Docker Compose is introduced.
+env/credential stores, source exports and DB data. The n8n Community OCI Compose is separate from the backend image and is not started here.
 
 ```powershell
 docker build -t rmi-backend:review .
@@ -180,11 +183,11 @@ and query timeout/cancel/concurrency/row/byte budgets remain unchanged.
 Use a dedicated non-admin OS/service identity with no model ownership or indiscriminate
 secret-store access. Grant only scoped required credentials; do not mount the operator's
 Windows profile or credential store. Provider-specific secret/runtime identity setup remains
-pending because no deployment target/account configuration is available or used.
+pending because the selected targets have not been provisioned and no real account configuration is used.
 
 ## n8n setup and remaining gate
 
-In every HTTP Request node, bind Generic Credential Type → Header Auth manually in n8n Cloud:
+In every HTTP Request node, bind Generic Credential Type → Header Auth manually in n8n Community (Cloud is development-compatible):
 Name=X-RMI-Service-Key; Value from N8N_SERVICE_API_KEY. No credential ID/value is exported.
 Missing binding fails instead of making anonymous calls. The separate webhook credential
 continues to use X-RMI-Orchestration-Key/N8N_WEBHOOK_SECRET; do not reuse it for API service auth.

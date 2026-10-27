@@ -56,6 +56,7 @@ def test_policy_rejects_unsafe_mutation(workflow, change):
 
 def responses():
     ready = {
+        "status": "ready",
         "model_ready": True,
         "artifact_integrity": "verified",
         "workload_identity_configured": True,
@@ -117,7 +118,7 @@ def test_success_and_idempotent_replay_drop_rows(workflow):
     assert "synthetic-row-must-not-reach-summary" not in json.dumps(first["summary"])
     body = replies["/predictions/current/persist?limit=100"][0]["body"]
     body.update(rows_inserted=0, rows_existing=100)
-    second = simulate(workflow, replies, start="Schedule Every 15 Minutes")
+    second = simulate(workflow, replies, start="Schedule Every 30 Minutes")
     assert second["summary"]["status"] == "success_idempotent"
     assert second["summary"]["persistence_succeeded"] is True
 
@@ -147,7 +148,7 @@ def test_recovery_after_both_backoffs(workflow):
     assert result["waits"] == [30, 60]
 
 
-@pytest.mark.parametrize("status", [400, 403, 413, 422, 500])
+@pytest.mark.parametrize("status", [400, 401, 403, 413, 422, 500])
 def test_non_retryable_status_no_wait(workflow, status):
     replies = responses()
     replies["/predictions/current/persist?limit=100"] = [{"statusCode": status, "body": {}}]
@@ -162,6 +163,8 @@ def test_ready_503_and_flags_stop_without_persistence(workflow):
     result = simulate(workflow, replies)
     assert result["summary"]["status"] == "not_ready"
     assert all(c["method"] != "POST" for c in result["calls"])
+    assert result["waits"] == [30, 45]
+    assert sum(c["endpoint"] == "/ready" for c in result["calls"]) == 3
     replies["/ready"][0]["statusCode"] = 200
     for flag in (
         "model_ready",
@@ -189,7 +192,8 @@ def test_health_failure_stops_before_ready(workflow):
     replies["/health"] = [{"statusCode": 503, "body": {}}]
     result = simulate(workflow, replies)
     assert result["summary"]["status"] == "health_unavailable"
-    assert result["calls"] == [{"method": "GET", "endpoint": "/health"}]
+    assert result["calls"] == [{"method": "GET", "endpoint": "/health"}] * 3
+    assert result["waits"] == [30, 45]
 
 
 @pytest.mark.parametrize("url", ["https://backend.example.org", "https://api.example.org:443"])
@@ -203,6 +207,63 @@ def test_transport_errors_never_echo_diagnostics(workflow):
     result = simulate(workflow, replies)
     assert result["summary"]["status"] == "persistence_failed" and not result["waits"]
     assert "private-diagnostic" not in json.dumps(result["summary"])
+
+
+@pytest.mark.parametrize("endpoint", ["/health", "/ready"])
+def test_cold_start_recovers_after_two_visual_waits(workflow, endpoint):
+    replies = responses()
+    success = copy.deepcopy(replies[endpoint][0])
+    replies[endpoint] = [
+        {"statusCode": 502, "body": {}},
+        {"error": {"code": "ETIMEDOUT", "message": "private-diagnostic"}},
+        success,
+    ]
+    result = simulate(workflow, replies)
+    assert result["summary"]["status"] == "success"
+    assert result["waits"] == [30, 45]
+    assert sum(c["endpoint"] == endpoint for c in result["calls"]) == 3
+    assert "private-diagnostic" not in json.dumps(result["summary"])
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 413, 422])
+@pytest.mark.parametrize("endpoint", ["/health", "/ready"])
+def test_warmup_nonretryable_statuses_never_write(workflow, endpoint, status):
+    replies = responses()
+    replies[endpoint] = [{"statusCode": status, "body": {}}]
+    result = simulate(workflow, replies)
+    assert not result["waits"]
+    assert sum(c["endpoint"] == endpoint for c in result["calls"]) == 1
+    assert not any(c["method"] == "POST" for c in result["calls"])
+
+
+def test_recognized_write_timeout_retries_but_unknown_error_does_not(workflow):
+    replies = responses()
+    success = copy.deepcopy(replies["/predictions/current/persist?limit=100"][0])
+    replies["/predictions/current/persist?limit=100"] = [
+        {"error": {"code": "ETIMEDOUT", "message": "private-diagnostic"}},
+        success,
+    ]
+    result = simulate(workflow, replies)
+    assert result["summary"]["status"] == "success" and result["waits"] == [30]
+    assert result["summary"]["retry_count"] == 1
+    assert "private-diagnostic" not in json.dumps(result["summary"])
+
+
+def test_history_can_be_skipped_without_repeating_a_write(workflow):
+    for node in workflow["nodes"]:
+        if node["name"] == "FastAPI Configuration":
+            node["parameters"]["assignments"]["assignments"][1]["value"] = False
+    result = simulate(workflow, responses())
+    assert result["summary"]["status"] == "success"
+    assert result["summary"]["history_rows_returned"] is None
+    assert sum(c["method"] == "POST" for c in result["calls"]) == 1
+    assert not any("history" in c["endpoint"] for c in result["calls"])
+
+
+def test_invalid_success_counts_fail_closed(workflow):
+    replies = responses()
+    replies["/predictions/current/persist?limit=100"][0]["body"]["rows_inserted"] = 101
+    assert simulate(workflow, replies)["summary"]["status"] == "persistence_failed"
 
 
 @pytest.mark.parametrize(

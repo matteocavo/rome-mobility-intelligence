@@ -1,5 +1,5 @@
 {
-  "name": "Rome Mobility - Prediction Orchestration",
+  "name": "Rome Mobility - n8n Community Primary Orchestration",
   "active": false,
   "nodes": [
     {
@@ -8,26 +8,26 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        0
+        -1100,
+        -100
       ],
       "parameters": {}
     },
     {
       "id": "schedule-every-15-minutes",
-      "name": "Schedule Every 15 Minutes",
+      "name": "Schedule Every 30 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        260,
-        0
+        -1100,
+        200
       ],
       "parameters": {
         "rule": {
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 15
+              "minutesInterval": 30
             }
           ]
         }
@@ -39,7 +39,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -260,
+        -850,
         0
       ],
       "parameters": {
@@ -50,6 +50,12 @@
               "name": "RMI_API_BASE_URL",
               "value": "",
               "type": "string"
+            },
+            {
+              "id": "fetch-history",
+              "name": "FETCH_HISTORY",
+              "value": true,
+              "type": "boolean"
             }
           ]
         },
@@ -63,7 +69,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        520,
+        -600,
         0
       ],
       "parameters": {
@@ -97,7 +103,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        780,
+        0,
         0
       ],
       "parameters": {
@@ -116,7 +122,7 @@
               "followRedirects": false
             }
           },
-          "timeout": 10000
+          "timeout": 15000
         },
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
@@ -131,8 +137,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1040,
-        0
+        -600,
+        400
       ],
       "parameters": {
         "assignments": {
@@ -221,7 +227,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1300,
+        440,
         0
       ],
       "parameters": {
@@ -255,7 +261,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1560,
+        1200,
         0
       ],
       "parameters": {
@@ -274,7 +280,7 @@
               "followRedirects": false
             }
           },
-          "timeout": 10000
+          "timeout": 15000
         },
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
@@ -289,8 +295,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        0,
-        220
+        900,
+        1100
       ],
       "parameters": {
         "assignments": {
@@ -352,7 +358,7 @@
             {
               "id": "retry_count",
               "name": "retry_count",
-              "value": "={{ $json.retry_count ?? 0 }}",
+              "value": "={{ $json.stage_retry_count ?? 0 }}",
               "type": "number"
             },
             {
@@ -379,8 +385,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        260,
-        220
+        1640,
+        0
       ],
       "parameters": {
         "conditions": {
@@ -393,7 +399,7 @@
           "conditions": [
             {
               "id": "ready-for-persistence",
-              "leftValue": "={{ $json.statusCode === 200 && $json.body?.model_ready === true && $json.body?.artifact_integrity === 'verified' && $json.body?.workload_identity_configured === true && $json.body?.database_configured === true && $json.body?.prediction_persistence_enabled === true }}",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ready' && $json.body?.model_ready === true && $json.body?.artifact_integrity === 'verified' && $json.body?.workload_identity_configured === true && $json.body?.database_configured === true && $json.body?.prediction_persistence_enabled === true }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -413,8 +419,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        520,
-        220
+        2100,
+        1100
       ],
       "parameters": {
         "assignments": {
@@ -476,7 +482,7 @@
             {
               "id": "retry_count",
               "name": "retry_count",
-              "value": "={{ $json.retry_count ?? 0 }}",
+              "value": "={{ $json.stage_retry_count ?? 0 }}",
               "type": "number"
             },
             {
@@ -503,8 +509,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        780,
-        220
+        2400,
+        0
       ],
       "parameters": {
         "method": "POST",
@@ -537,8 +543,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1040,
-        220
+        2620,
+        0
       ],
       "parameters": {
         "assignments": {
@@ -561,8 +567,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1300,
-        220
+        2840,
+        0
       ],
       "parameters": {
         "conditions": {
@@ -575,7 +581,7 @@
           "conditions": [
             {
               "id": "persist-1-ok",
-              "leftValue": "={{ $json.statusCode === 200 }}",
+              "leftValue": "={{ $json.statusCode === 200 && ['rows_evaluated','rows_inserted','rows_existing'].every(k => Number.isInteger($json.body?.[k]) && $json.body[k] >= 0 && $json.body[k] <= 100) && $json.body.rows_inserted + $json.body.rows_existing === $json.body.rows_evaluated }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -595,8 +601,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1560,
-        220
+        3060,
+        0
       ],
       "parameters": {
         "conditions": {
@@ -609,7 +615,7 @@
           "conditions": [
             {
               "id": "retryable-attempt-1",
-              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 }}",
+              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -629,8 +635,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        0,
-        440
+        3280,
+        120
       ],
       "parameters": {
         "resume": "timeInterval",
@@ -644,8 +650,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        260,
-        440
+        2400,
+        300
       ],
       "parameters": {
         "method": "POST",
@@ -678,8 +684,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        520,
-        440
+        2620,
+        300
       ],
       "parameters": {
         "assignments": {
@@ -702,8 +708,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        780,
-        440
+        2840,
+        300
       ],
       "parameters": {
         "conditions": {
@@ -716,7 +722,7 @@
           "conditions": [
             {
               "id": "persist-2-ok",
-              "leftValue": "={{ $json.statusCode === 200 }}",
+              "leftValue": "={{ $json.statusCode === 200 && ['rows_evaluated','rows_inserted','rows_existing'].every(k => Number.isInteger($json.body?.[k]) && $json.body[k] >= 0 && $json.body[k] <= 100) && $json.body.rows_inserted + $json.body.rows_existing === $json.body.rows_evaluated }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -736,8 +742,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1040,
-        440
+        3060,
+        300
       ],
       "parameters": {
         "conditions": {
@@ -750,7 +756,7 @@
           "conditions": [
             {
               "id": "retryable-attempt-2",
-              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 }}",
+              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -770,8 +776,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1300,
-        440
+        3280,
+        420
       ],
       "parameters": {
         "resume": "timeInterval",
@@ -785,8 +791,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1560,
-        440
+        2400,
+        600
       ],
       "parameters": {
         "method": "POST",
@@ -819,8 +825,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        0,
-        660
+        2620,
+        600
       ],
       "parameters": {
         "assignments": {
@@ -843,8 +849,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        260,
-        660
+        2840,
+        600
       ],
       "parameters": {
         "conditions": {
@@ -857,7 +863,7 @@
           "conditions": [
             {
               "id": "persist-3-ok",
-              "leftValue": "={{ $json.statusCode === 200 }}",
+              "leftValue": "={{ $json.statusCode === 200 && ['rows_evaluated','rows_inserted','rows_existing'].every(k => Number.isInteger($json.body?.[k]) && $json.body[k] >= 0 && $json.body[k] <= 100) && $json.body.rows_inserted + $json.body.rows_existing === $json.body.rows_evaluated }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -877,8 +883,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        520,
-        660
+        3300,
+        1100
       ],
       "parameters": {
         "assignments": {
@@ -967,8 +973,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        780,
-        660
+        3600,
+        0
       ],
       "parameters": {
         "assignments": {
@@ -1027,8 +1033,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1040,
-        660
+        4040,
+        0
       ],
       "parameters": {
         "method": "GET",
@@ -1061,8 +1067,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1300,
-        660
+        4260,
+        0
       ],
       "parameters": {
         "conditions": {
@@ -1095,8 +1101,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1560,
-        660
+        4480,
+        0
       ],
       "parameters": {
         "assignments": {
@@ -1185,8 +1191,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        0,
-        880
+        4480,
+        300
       ],
       "parameters": {
         "assignments": {
@@ -1268,6 +1274,778 @@
         "includeOtherFields": false,
         "options": {}
       }
+    },
+    {
+      "id": "health-outcome-1",
+      "name": "Health Outcome 1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "health-retryable-1",
+      "name": "Health Retryable 1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.statusCode === 502 || $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "health-wait-30-seconds",
+      "name": "Health Wait 30 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        120
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "health-attempt-2",
+      "name": "Health Attempt 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/health\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
+    },
+    {
+      "id": "health-outcome-2",
+      "name": "Health Outcome 2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "health-2-ok",
+      "name": "Health 2 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ok' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "health-retryable-2",
+      "name": "Health Retryable 2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.statusCode === 502 || $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "health-wait-45-seconds",
+      "name": "Health Wait 45 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        720
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 45,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "health-attempt-3",
+      "name": "Health Attempt 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/health\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
+    },
+    {
+      "id": "health-outcome-3",
+      "name": "Health Outcome 3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        600
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "health-3-ok",
+      "name": "Health 3 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ok' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-outcome-1",
+      "name": "Ready Outcome 1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1420,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-retryable-1",
+      "name": "Ready Retryable 1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1860,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-for-persistence",
+              "leftValue": "={{ $json.statusCode === 502 || $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) || $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-wait-30-seconds",
+      "name": "Ready Wait 30 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        120
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "ready-attempt-2",
+      "name": "Ready Attempt 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/ready\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
+    },
+    {
+      "id": "ready-outcome-2",
+      "name": "Ready Outcome 2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1420,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-2-ok",
+      "name": "Ready 2 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1640,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-for-persistence",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ready' && $json.body?.model_ready === true && $json.body?.artifact_integrity === 'verified' && $json.body?.workload_identity_configured === true && $json.body?.database_configured === true && $json.body?.prediction_persistence_enabled === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-retryable-2",
+      "name": "Ready Retryable 2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1860,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-for-persistence",
+              "leftValue": "={{ $json.statusCode === 502 || $json.statusCode === 503 || $json.statusCode === 504 || (!$json.statusCode && (['ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes($json.error?.code || $json.error?.cause?.code || '') || /(?:timed out|timeout)/i.test(String(typeof $json.error === 'string' ? $json.error : $json.error?.message || '').slice(0, 512)))) || $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-wait-45-seconds",
+      "name": "Ready Wait 45 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        720
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 45,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "ready-attempt-3",
+      "name": "Ready Attempt 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        600
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/ready\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
+    },
+    {
+      "id": "ready-outcome-3",
+      "name": "Ready Outcome 3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1420,
+        600
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage-attempt",
+              "name": "stage_attempt",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "stage-retry-count",
+              "name": "stage_retry_count",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-3-ok",
+      "name": "Ready 3 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1640,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-for-persistence",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ready' && $json.body?.model_ready === true && $json.body?.artifact_integrity === 'verified' && $json.body?.workload_identity_configured === true && $json.body?.database_configured === true && $json.body?.prediction_persistence_enabled === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fetch-history",
+      "name": "Fetch History",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3820,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $('FastAPI Configuration').first().json.FETCH_HISTORY === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "success-without-history",
+      "name": "Success Without History",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3820,
+        600
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ $('Persistence Summary').first().json.source_watermark }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ $('Persistence Summary').first().json.rows_evaluated }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ $('Persistence Summary').first().json.rows_inserted }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ $('Persistence Summary').first().json.rows_existing }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ $('Persistence Summary').first().json.model_version }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ $('Persistence Summary').first().json.threshold }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "={{ $('Persistence Summary').first().json.rows_inserted === 0 && $('Persistence Summary').first().json.rows_existing === $('Persistence Summary').first().json.rows_evaluated ? 'success_idempotent' : 'success' }}",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $('Persistence Summary').first().json.retry_count }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": 200,
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1282,7 +2060,7 @@
         ]
       ]
     },
-    "Schedule Every 15 Minutes": {
+    "Schedule Every 30 Minutes": {
       "main": [
         [
           {
@@ -1297,7 +2075,7 @@
       "main": [
         [
           {
-            "node": "Health OK",
+            "node": "Health Outcome 1",
             "type": "main",
             "index": 0
           }
@@ -1315,7 +2093,7 @@
         ],
         [
           {
-            "node": "Health Unavailable",
+            "node": "Health Retryable 1",
             "type": "main",
             "index": 0
           }
@@ -1326,7 +2104,7 @@
       "main": [
         [
           {
-            "node": "Ready For Persistence",
+            "node": "Ready Outcome 1",
             "type": "main",
             "index": 0
           }
@@ -1344,7 +2122,7 @@
         ],
         [
           {
-            "node": "Not Ready",
+            "node": "Ready Retryable 1",
             "type": "main",
             "index": 0
           }
@@ -1533,7 +2311,7 @@
       "main": [
         [
           {
-            "node": "History Followup",
+            "node": "Fetch History",
             "type": "main",
             "index": 0
           }
@@ -1597,12 +2375,328 @@
           }
         ]
       ]
+    },
+    "Health Outcome 1": {
+      "main": [
+        [
+          {
+            "node": "Health OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Retryable 1": {
+      "main": [
+        [
+          {
+            "node": "Health Wait 30 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Wait 30 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Health Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Health Outcome 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Outcome 2": {
+      "main": [
+        [
+          {
+            "node": "Health 2 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health 2 OK": {
+      "main": [
+        [
+          {
+            "node": "Ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Retryable 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Retryable 2": {
+      "main": [
+        [
+          {
+            "node": "Health Wait 45 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Wait 45 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Health Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Health Outcome 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Outcome 3": {
+      "main": [
+        [
+          {
+            "node": "Health 3 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health 3 OK": {
+      "main": [
+        [
+          {
+            "node": "Ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Outcome 1": {
+      "main": [
+        [
+          {
+            "node": "Ready For Persistence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Retryable 1": {
+      "main": [
+        [
+          {
+            "node": "Ready Wait 30 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Wait 30 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Ready Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Ready Outcome 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Outcome 2": {
+      "main": [
+        [
+          {
+            "node": "Ready 2 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready 2 OK": {
+      "main": [
+        [
+          {
+            "node": "Persist Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ready Retryable 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Retryable 2": {
+      "main": [
+        [
+          {
+            "node": "Ready Wait 45 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Wait 45 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Ready Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Ready Outcome 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Outcome 3": {
+      "main": [
+        [
+          {
+            "node": "Ready 3 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready 3 OK": {
+      "main": [
+        [
+          {
+            "node": "Persist Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History": {
+      "main": [
+        [
+          {
+            "node": "History Followup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Without History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "timezone": "Europe/Rome",
-    "executionTimeout": 600,
+    "executionTimeout": 840,
     "saveDataSuccessExecution": "none",
     "saveDataErrorExecution": "none",
     "saveManualExecutions": false,

@@ -21,6 +21,15 @@ FORBIDDEN_DIRS = {
     "temp",
 }
 FORBIDDEN_SUFFIXES = {
+    ".gpg",
+    ".sqlite",
+    ".sqlite3",
+    ".sqlite-wal",
+    ".sqlite-shm",
+    ".db",
+    ".tar",
+    ".gz",
+    ".tgz",
     ".pyc",
     ".pyo",
     ".pem",

@@ -1,5 +1,8 @@
 # Zero-cost runtime preparation
 
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](../ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
 P0: recurring infrastructure cost charged to the owner must be **0 EUR**. Quota
 exhaustion, cold starts, autosuspend and temporary unavailability are acceptable;
 trials, metered billing and mandatory paid orchestration are not. This is a candidate
@@ -8,20 +11,20 @@ billing, model uploads, production secrets or databases are created by this chan
 
 ## Target and activation boundary
 
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**.
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**.
 **GitHub Actions: zero-cost fallback scheduler**.
 
 A meaningful low-code/no-code layer is a P0 requirement alongside mandatory infrastructure
 cost of **0 EUR/month**. It should be the primary orchestrator if technically sustainable.
-The next task, **ZERO-COST LOW-CODE ORCHESTRATION SELECTION**, evaluates n8n Community,
-Make Free or equivalent before choosing. No candidate is selected in this PR.
+Approved selection: n8n Community on OCI Always Free. Make Free is second choice at degraded
+cadence only; Retool is an optional future operations UI. Deployment is not performed.
 
 ```text
 Databricks Free -> FastAPI -> PostgreSQL Free
                      ^
                      | HTTPS: authenticated operational orchestration
-LOW-CODE / NO-CODE ORCHESTRATOR (selection pending)
-  candidates: n8n Community / Make Free / equivalent
+n8n Community on OCI Always Free (not yet provisioned)
+  primary cadence: 30 minutes; FastAPI HTTPS calls only
 
 Fallback only: GitHub Actions -> HTTPS FastAPI
 Future: Google AI Studio / public frontend -> FastAPI public/user-authenticated layer
@@ -30,8 +33,7 @@ Private Neon Object Storage -> Render BuildKit secret -> bounded verified bundle
   -> root-owned model in Render's private built image -> trusted runtime loader
 ```
 
-n8n is an **implemented candidate low-code integration; production role pending zero-cost
-selection**. Its client, inactive workflows, documentation, service authentication and
+n8n is an **primary low-code integration; selected and prepared, not yet provisioned**. Its client, inactive workflows, documentation, service authentication and
 webhook boundary remain intact. A paid n8n Cloud subscription cannot be required. Retool
 is not implemented or selected; it may be considered only as a future operational/admin UI.
 Do not run competing schedulers concurrently. No n8n account, Admin API, PAT, direct database
@@ -81,12 +83,12 @@ inheritance are disabled; response bodies are bounded to 64 KiB.
 | Component | Selected configuration | Owner recurring cost |
 | --- | --- | --- |
 | Actions fallback | Standard ubuntu-latest, public repository, opt-in only | 0 EUR |
-| Primary low-code/no-code orchestrator | Selection pending; must meet zero-cost target | 0 EUR target |
+| Primary low-code/no-code orchestrator | n8n Community + OCI Always Free, not provisioned | 0 EUR target |
 | Render | Hobby + Free web service; no payment method, no paid disk/compute | 0 EUR |
 | Neon PostgreSQL | Free only, one project, no paid upgrade | 0 EUR |
 | Neon Object Storage | Same Free project, private | 0 EUR |
 | Databricks | Existing Free workspace; no plan changes | 0 EUR (operator-provided existing plan) |
-| n8n integration | Implemented candidate; production role pending selection; paid Cloud cannot be mandatory | 0 EUR mandatory target |
+| n8n integration | Community primary; paid Cloud cannot be mandatory | 0 EUR mandatory target |
 
 Render Free: 512 MB RAM, 0.1 CPU, 750 shared instance hours/month, sleep after 15 minutes
 idle, approximately one-minute wake-up, ephemeral filesystem, no free persistent disk.
@@ -224,9 +226,9 @@ deletion, grants or database changes are implemented in this PR.
    provider-built image privacy and BuildKit behavior with a nonsecret synthetic source first.
 3. Separately authorized private model upload, production DB/TLS/roles and scoped secrets;
    real read-only source + idempotent persistence smoke; retention/backup operational choice.
-4. Complete ZERO-COST LOW-CODE ORCHESTRATION SELECTION before selecting the primary
-   orchestrator. Configure Actions secrets/opt-in only if fallback use is explicitly chosen
-   after secure deployment. Neither Actions nor n8n is activated by this PR.
+4. Follow the OCI preparation/backup/restore runbooks. **ONLY ONE scheduler active at a time**:
+   primary n8n active means Actions disabled. Stop/unpublish n8n before enabling fallback;
+   disable Actions and drain its run before republishing n8n. Nothing is activated by this PR.
 
 ## Official references (checked 2026-10-27)
 

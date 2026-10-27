@@ -1,25 +1,28 @@
 # Architettura
 
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](../ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
 ## Decisione P0: costo ricorrente zero
 
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Un layer low-code/no-code reale
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. Un layer low-code/no-code reale
 e significativo resta requisito P0; sara orchestratore principale se sostenibile a costo zero.
 **GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti, opt-in e senza keep-alive.
-n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+n8n: primary low-code integration; selected and prepared, not yet provisioned.
 Non attivare orchestratori concorrenti sullo stesso percorso. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
 
 ```text
 Databricks Free -> FastAPI -> PostgreSQL Free
                      ^
-LOW-CODE / NO-CODE ORCHESTRATOR (selection pending)
+n8n Community on OCI Always Free (not yet provisioned)
                      | operational orchestration via authenticated HTTPS
 
 Fallback: GitHub Actions -> FastAPI
 Future: Google AI Studio / public frontend -> FastAPI public/user-authenticated layer
 ```
 
-Prossima task: **ZERO-COST LOW-CODE ORCHESTRATION SELECTION**. Nessuna scelta tra n8n
-Community, Make Free o equivalenti in questa PR. Frontend, orchestratore, storage modello,
+Decisione approvata: n8n Community su OCI Always Free, Make Free seconda scelta con cadenza
+ridotta, Retool solo futura UI operativa opzionale. Frontend, orchestratore, storage modello,
 FastAPI, PostgreSQL e Databricks mantengono ciascuno il target obbligatorio di 0 EUR/month.
 
 ## Preparazione deployment
@@ -39,7 +42,7 @@ worker. Nessun provider o deployment effettivo. [Audit e requisiti](SECURE_DEPLO
 | --- | --- |
 | Databricks / repository core | Ingestion, Bronze/Silver/enrichment, feature causali, etichette, Gold, serving datasets, qualità e dashboard |
 | Questo repository | Configurazione, accesso SELECT, training/evaluation sklearn, persistenza, caricamento, inference interna e API FastAPI |
-| n8n Cloud | Template HTTP inattivi e boundary webhook autenticato; nessun duplicato dei Job Databricks |
+| n8n Community su OCI | Primary visuale HTTP inattivo, boundary webhook autenticato; nessun duplicato dei Job Databricks |
 | React + Google AI Studio, futuro | App e progettazione UX/UI che consumano API validate |
 
 Spark ML rimane ricerca/riferimento storico. Non si converte la Random Forest Spark;
@@ -129,7 +132,7 @@ La history API legge soltanto PostgreSQL, con filtri e range bounded. Nessun SQL
 route, salvataggio implicito, scheduler attivo o frontend. n8n e un candidato layer low-code implementato
 di questi endpoint. [Disegno e limiti](PREDICTION_HISTORY.md).
 
-## Orchestratore n8n Cloud
+## Orchestratore n8n Community su OCI
 
 Lo schedule n8n chiama readiness → persistence → history → summary, con due retry bounded.
 FastAPI resta responsabile di contract, modello, SQL, transazioni e idempotenza.
@@ -139,4 +142,4 @@ risponde soltanto con ACK: non richiama FastAPI né esegue persistence. Non esis
 pubblico di trigger e nessun endpoint esistente viene modificato per chiamare n8n.
 Questo evita loop tra trigger e operazione. Nessuna Admin API o credenziale DB/Databricks
 in n8n. Google AI Studio/frontend futuro passa sempre da FastAPI autenticata/rate-limited.
-[Configurazione/import e smoke Cloud pending](N8N_CLOUD_ORCHESTRATION.md).
+[Configurazione/import e smoke runtime pending](N8N_CLOUD_ORCHESTRATION.md).
