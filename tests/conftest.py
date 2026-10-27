@@ -28,3 +28,15 @@ def bundle(tmp_path, trained):
     path = tmp_path / "bundle"
     persist(path, *trained)
     return path
+
+
+@pytest.fixture
+def bundle_trust(bundle):
+    import hashlib
+
+    return {
+        "trusted_root": bundle.parent,
+        "expected_manifest_sha256": hashlib.sha256(
+            (bundle / "checksums.json").read_bytes()
+        ).hexdigest(),
+    }

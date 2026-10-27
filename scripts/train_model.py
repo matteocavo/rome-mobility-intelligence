@@ -38,6 +38,10 @@ def main():
     else:
         if not args.plan:
             parser.error("Databricks mode requires --plan with measured capacity evidence")
+        if args.cache_directory and args.plan.resolve().is_relative_to(
+            args.cache_directory.resolve()
+        ):
+            parser.error("The trusted plan and export checksum must be stored outside the cache")
         if (
             code_sha == "uncommitted-fixture-only"
             or subprocess.check_output(

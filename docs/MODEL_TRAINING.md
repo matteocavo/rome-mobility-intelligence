@@ -77,3 +77,11 @@ osservata è riportata rispetto alla popolazione e non è bilanciata artificialm
 La selezione viene salvata prima del TEST con `freeze_selection`; un gate esistente non si sovrascrive.
 `--cache-directory` riusa un export locale fidato dopo verifica di checksum e protocollo, senza
 nuove query. Dati e cache non sono inclusi in Git.
+
+## Trust richiesta prima del caricamento
+
+Il bundle auto-descrittivo non è più sufficiente: servono root fidata e SHA-256 atteso del
+manifest forniti fuori dal bundle. [Protocollo runtime](RUNTIME_SECURITY.md). La validation CLI
+richiede --trusted-root e --expected-manifest-sha256. La cache di export richiede una pin
+export_manifest_sha256 nel piano fidato esterno alla directory cache. Non approvare a runtime
+una pin ricavata da un bundle/cache potenzialmente controllato da terzi.

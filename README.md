@@ -55,15 +55,19 @@ Eseguire dalla root, con le dipendenze installate:
 
 ```powershell
 python -m scripts.train_model --source fixture --output artifacts/fixture-v1
-python -m scripts.validate_model_artifact artifacts/fixture-v1
-$env:MODEL_ARTIFACT_PATH="artifacts/fixture-v1"
+# Fixture appena prodotta da codice locale fidato: conservare la pin fuori dal bundle.
+$env:MODEL_ARTIFACT_PATH=(Resolve-Path artifacts/fixture-v1).Path
+$env:MODEL_ARTIFACT_ROOT=(Resolve-Path artifacts).Path
+$env:MODEL_ARTIFACT_MANIFEST_SHA256=(Get-FileHash "$env:MODEL_ARTIFACT_PATH/checksums.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+python -m scripts.validate_model_artifact $env:MODEL_ARTIFACT_PATH --trusted-root $env:MODEL_ARTIFACT_ROOT --expected-manifest-sha256 $env:MODEL_ARTIFACT_MANIFEST_SHA256
 python -m uvicorn app.main:app --reload
 ```
 
 La fixture è **solo sintetica**, marcata nei metadata e in `/model/info`. Il bundle contiene
 pipeline joblib, metadata JSON, contratto completo e checksum. Non sovrascrive bundle esistenti.
-Caricare soltanto artifact locali fidati: joblib può eseguire codice; i checksum rilevano
-corruzione ma non autenticano un mittente. Il loader richiede la stessa versione sklearn.
+Caricare soltanto artifact locali fidati: joblib può eseguire codice; la pin del manifest deve essere fornita dalla configurazione fidata esterna al bundle.
+Non ricavare la pin da un bundle scaricato e non revisionato: firmerebbe la sostituzione dell’attaccante.
+Il loader rifiuta symlink/reparse e deserializza gli stessi byte verificati, senza riaprire il file. Il loader richiede la stessa versione sklearn.
 
 ## Training Databricks
 
@@ -122,7 +126,7 @@ Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundatio
 Per avviare soltanto metadata/readiness con il bundle validato, presente solo sulla macchina di training:
 
 ```powershell
-$env:MODEL_ARTIFACT_PATH="artifacts/real-sklearn-20261026-v1"
+# La configurazione .env locale punta alla copia protetta e include root/pin esterne.
 python -m uvicorn app.main:app
 ```
 
@@ -137,3 +141,11 @@ al profilo CLI personale o a `DATABRICKS_TOKEN`. Il secret locale è nel Credent
 Windows; `.env` contiene soltanto client ID, endpoint e nome della voce protetta.
 Ogni connessione verifica `current_user()` contro il client ID configurato prima della query.
 Permessi runtime e verifiche: [workload identity](docs/WORKLOAD_IDENTITY.md).
+
+## Confini di sicurezza runtime
+
+Artifact path assoluto sotto MODEL_ARTIFACT_ROOT e MODEL_ARTIFACT_MANIFEST_SHA256 esterna sono
+obbligatori se si configura un modello. La copia in artifacts/ resta staging storico; la copia
+servita locale è fuori da OneDrive, in storage con ACL restrittive. Un clone non include la pin
+né il modello. Query: deadline 120s, coda massima 1s, un solo worker SQL per warehouse/processo,
+STATEMENT_TIMEOUT di sessione e LIMIT server-side. [Dettagli e limiti](docs/RUNTIME_SECURITY.md).
