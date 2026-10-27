@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     database_statement_timeout_ms: int = Field(default=5000, ge=100, le=30000)
     history_max_rows: int = Field(default=200, ge=1, le=200)
     history_max_range_days: int = Field(default=7, ge=1, le=7)
+    n8n_webhook_url: SecretStr = SecretStr("")
+    n8n_webhook_secret: SecretStr = SecretStr("")
+    n8n_webhook_allowed_host: str = ""
+    n8n_webhook_timeout_seconds: float = Field(default=5, ge=0.1, le=10)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

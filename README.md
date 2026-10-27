@@ -96,7 +96,7 @@ Il modello si carica una volta all'avvio tramite il loader trusted. La soglia vi
 (0.35 per il modello reale corrente), mai dalla richiesta. Le fixture sintetiche sono rifiutate
 dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query SQL.
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
-Prediction history PostgreSQL è opzionale e disabilitata di default; nessun frontend o n8n.
+Prediction history PostgreSQL è opzionale e disabilitata di default; nessun frontend.
 Autenticazione API e hosting sono fasi successive.
 Public deployment is NOT yet approved: serve un account OS di servizio separato, senza ownership
 dello storage modello e senza accesso al credential store personale dell'operatore.
@@ -109,7 +109,17 @@ atomicamente con unique constraint e ON CONFLICT; un secondo batch identico non 
 `GET /predictions/history` consulta lo storico con filtri allowlist, max 200 righe e intervalli
 max 7 giorni. Preview e POST /predict restano stateless. Nessuna scrittura Databricks.
 Schema gestito da `alembic upgrade head`, mai creato automaticamente all'avvio.
-[Setup, idempotenza, sicurezza e smoke PostgreSQL da completare](docs/PREDICTION_HISTORY.md).
+[Setup, idempotenza, sicurezza e validazione PostgreSQL nativa](docs/PREDICTION_HISTORY.md).
+
+## Orchestrazione n8n Cloud
+
+Target: n8n Cloud, con workflow importabili manualmente e inattivi in [ops/n8n](ops/n8n/README.md).
+Schedule ogni 15 minuti, retry selettivi e summary compatti; webhook separato con Header Auth.
+Il client server-side FastAPI usa soltanto URL HTTPS configurata, host esplicitamente fidato,
+secret privato e payload minimo. Nessuna n8n Admin API/key, Docker o installazione n8n locale.
+[Import, autenticazione e confini](docs/N8N_CLOUD_ORCHESTRATION.md).
+Lo smoke Cloud resta pending: n8n Cloud non può raggiungere in sicurezza il FastAPI locale.
+Nessun deploy pubblico o tunnel è approvato o creato.
 
 ## Verifiche
 
@@ -132,7 +142,7 @@ delle API pandas/sklearn; non viene dichiarata copertura statica completa.
 1. Revisionare il primo artifact reale e il protocollo di valutazione.
 2. Acquisire nuove date TEST indipendenti e rivalidare prima del serving operativo.
 3. Accettare freshness, autenticazione e serving inference.
-4. Completare lo smoke PostgreSQL locale della history opzionale, poi valutare orchestrazione.
+4. Preparare il deployment sicuro prima dello smoke n8n Cloud; mantenere i workflow inattivi.
 5. React e UX/UI con Google AI Studio, in una fase successiva.
 
 Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundation.
