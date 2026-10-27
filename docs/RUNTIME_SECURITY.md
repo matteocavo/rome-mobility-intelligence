@@ -1,5 +1,12 @@
 # Runtime security: artifact trust e query budgets
 
+L'API inference stateless estende questi stessi controlli, senza loader o connector paralleli.
+Schema HTTP chiuso per le 47 feature, nessun override di path/threshold/SQL e max batch 100.
+Query current fissa sul dataset scoring; log sanitizzati, errori senza input riflessi.
+I controlli di readiness non aprono connessioni Databricks. [Contratto API](INFERENCE_API.md).
+Public deployment is NOT yet approved: rimane necessario un account OS servizio separato,
+senza ownership dello storage modello e senza accesso al credential store personale.
+
 ## Trust degli artifact
 
 L’app riceve MODEL_ARTIFACT_PATH, MODEL_ARTIFACT_ROOT e MODEL_ARTIFACT_MANIFEST_SHA256

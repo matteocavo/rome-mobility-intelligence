@@ -89,3 +89,13 @@ max_rows+1 sono backstop server-side; i byte sono limitati anche durante il fetc
 Non sono limiti di configurazione del warehouse e non ne cambiano schedule o impostazioni.
 Il controllo concorrenza è per processo: più worker richiedono un gate coordinato a deployment.
 [Trust, cancel e limiti](RUNTIME_SECURITY.md).
+
+## Latest current scoring per inference
+
+CurrentScoringRepository è distinto dall'export storico pinned: legge soltanto la tabella
+fissa rome_transport.features.next_stop_delay_scoring, con MAX(feed_timestamp) nella stessa
+SELECT, window per lineage e LIMIT parametrizzato dopo ordinamento del grain. Non usa i setting
+di tabella del training né input HTTP come identifier/WHERE. Il client hardened resta unico.
+Massimo 100 righe, default API 50, budget 8 MB; null e dtype validati sulle sole 47 feature.
+L'età del feed è esposta senza SLA o soglia freshness implicita; ultimo feed invalido fallisce
+senza fallback. Nessun Bronze/Gold, audit write o prediction persistente. [API](INFERENCE_API.md).
