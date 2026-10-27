@@ -1,5 +1,17 @@
 # Runtime security: artifact trust e query budgets
 
+## Runtime candidato a costo zero
+
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Il layer low-code/no-code resta
+requisito P0 insieme al costo obbligatorio di 0 EUR/month.
+**GitHub Actions: zero-cost fallback scheduler**, opt-in con sole chiamate HTTPS FastAPI.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+La delivery preferita usa BuildKit secrets durante la build privata Render: manifest pin
+indipendente, download/extraction bounded, pubblicazione atomica e loader F02 invariato.
+Root/file del modello appartengono a root, runtime UID 10001 legge soltanto. Il bootstrap
+runtime alternativo e' disabilitato di default e non risolve l'egress a ogni cold start.
+Nessun secret o artifact reale in Git/image pubblica/Actions artifact. [Limiti](ZERO_COST_DEPLOYMENT.md).
+
 ## HTTP e deployment
 
 X-RMI-Service-Key protegge tutte le route operative in ogni ambiente. N8N_SERVICE_API_KEY è

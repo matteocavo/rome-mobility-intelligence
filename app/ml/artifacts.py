@@ -13,7 +13,7 @@ from sklearn.pipeline import Pipeline
 
 from app.contracts.operational_ml import CONTRACT, FEATURES, contract_digest
 from app.contracts.schemas import ArtifactMetadata
-from app.core.trusted_files import trusted_bytes
+from app.core.artifact_bootstrap import verify_bundle
 
 
 def persist(path: Path, pipeline: Pipeline, metadata: ArtifactMetadata) -> None:
@@ -34,19 +34,7 @@ def load(
 ) -> tuple[Pipeline, ArtifactMetadata]:
     if trusted_root is None or not re.fullmatch(r"[a-f0-9]{64}", expected_manifest_sha256):
         raise ValueError("An external trusted root and manifest digest are required")
-    manifest = trusted_bytes(path / "checksums.json", root=trusted_root, max_bytes=65536)
-    if hashlib.sha256(manifest).hexdigest() != expected_manifest_sha256:
-        raise ValueError("External manifest checksum mismatch")
-    checksums = json.loads(manifest)
-    if set(checksums) != {"pipeline.joblib", "metadata.json", "contract.json"}:
-        raise ValueError("Incomplete artifact manifest")
-    payloads = {}
-    for name, checksum in checksums.items():
-        if not isinstance(checksum, str) or not re.fullmatch(r"[a-f0-9]{64}", checksum):
-            raise ValueError("Invalid artifact checksum")
-        payloads[name] = trusted_bytes(path / name, root=trusted_root, max_bytes=64_000_000)
-        if hashlib.sha256(payloads[name]).hexdigest() != checksum:
-            raise ValueError("Artifact checksum mismatch")
+    payloads = verify_bundle(path, root=trusted_root, digest=expected_manifest_sha256)
     metadata = ArtifactMetadata.model_validate_json(payloads["metadata.json"])
     if metadata.contract_digest != contract_digest():
         raise ValueError("Contract mismatch")

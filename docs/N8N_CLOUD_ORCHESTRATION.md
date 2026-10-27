@@ -1,5 +1,15 @@
 # n8n Cloud orchestration
 
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. n8n is an
+implemented candidate low-code integration; production role pending zero-cost selection.
+A meaningful low-code/no-code layer remains required, with the primary orchestration role
+when technically sustainable at 0 EUR/month. A paid n8n Cloud subscription cannot be mandatory.
+**GitHub Actions: zero-cost fallback scheduler**, opt-in only, with bounded cold-start handling.
+Existing n8n code, inactive exports, service authentication and webhook boundary are retained;
+accounts/workflows are not activated. The 15-minute example is not a selected production
+cadence. Do not enable concurrent orchestrators. No n8n Community, Make or Retool selection
+is made here; evaluate candidates in ZERO-COST LOW-CODE ORCHESTRATION SELECTION. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
+
 ## FastAPI service authentication
 
 All HTTP Request nodes require Generic Credential Type → Header Auth, configured manually

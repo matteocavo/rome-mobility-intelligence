@@ -1,5 +1,27 @@
 # Architettura
 
+## Decisione P0: costo ricorrente zero
+
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Un layer low-code/no-code reale
+e significativo resta requisito P0; sara orchestratore principale se sostenibile a costo zero.
+**GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti, opt-in e senza keep-alive.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+Non attivare orchestratori concorrenti sullo stesso percorso. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
+
+```text
+Databricks Free -> FastAPI -> PostgreSQL Free
+                     ^
+LOW-CODE / NO-CODE ORCHESTRATOR (selection pending)
+                     | operational orchestration via authenticated HTTPS
+
+Fallback: GitHub Actions -> FastAPI
+Future: Google AI Studio / public frontend -> FastAPI public/user-authenticated layer
+```
+
+Prossima task: **ZERO-COST LOW-CODE ORCHESTRATION SELECTION**. Nessuna scelta tra n8n
+Community, Make Free o equivalenti in questa PR. Frontend, orchestratore, storage modello,
+FastAPI, PostgreSQL e Databricks mantengono ciascuno il target obbligatorio di 0 EUR/month.
+
 ## Preparazione deployment
 
 Tutti gli endpoint dati/inference sono ora service-to-service con X-RMI-Service-Key;
@@ -7,7 +29,8 @@ il frontend futuro richiede un'autenticazione utenti separata e non riceve quest
 HttpSecurity applica auth prima del body, budget globali bounded per classe, limiti byte,
 Host allowlist, header e log minimizzati. CORS è vuoto di default; forwarded headers non
 sono trusted. /health è liveness e /ready anonima è ridotta; i dettagli sono protetti.
-Container non-root provider-neutral, modello su mount read-only con digest esterno, un solo
+Container non-root provider-neutral, modello read-only (mount o immagine privata root-owned)
+con digest esterno, un solo
 worker. Nessun provider o deployment effettivo. [Audit e requisiti](SECURE_DEPLOYMENT.md).
 
 ## Confini
@@ -103,7 +126,7 @@ per preview e BatchScoringService. Solo il trigger manuale abilitato esplicitame
 PostgreSQL tramite PredictionHistoryRepository. Database gestisce engine/pool/sessioni,
 models definisce lo schema e Alembic applica le migrazioni fuori dal runtime HTTP.
 La history API legge soltanto PostgreSQL, con filtri e range bounded. Nessun SQL business nelle
-route, salvataggio implicito, scheduler attivo o frontend. n8n è soltanto un client opzionale
+route, salvataggio implicito, scheduler attivo o frontend. n8n e un candidato layer low-code implementato
 di questi endpoint. [Disegno e limiti](PREDICTION_HISTORY.md).
 
 ## Orchestratore n8n Cloud

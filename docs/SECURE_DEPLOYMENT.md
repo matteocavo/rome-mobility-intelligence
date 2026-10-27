@@ -1,5 +1,20 @@
 # Secure backend deployment preparation
 
+## Zero-cost candidate (supersedes provider-selection gaps below)
+
+P0 requires both 0 EUR/month mandatory recurring owner infrastructure cost and a meaningful
+low-code/no-code layer, primary orchestrator when technically sustainable.
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**.
+**GitHub Actions: zero-cost fallback scheduler**; opt-in only, never automatically enabled.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+A paid n8n Cloud subscription cannot be mandatory. No deployment is performed. [Zero-cost design, exact setup and remaining gates](ZERO_COST_DEPLOYMENT.md)
+selects Render Free + Neon Free and private build-time delivery via Dockerfile.zero-cost.
+The original Dockerfile remains the mount-based alternative. Build secrets never enter
+layers; verified model files in the provider's private image are root-owned/read-only to
+the non-root runtime. Independent runtime pin and trusted loader checks remain mandatory.
+Local Docker/WSL are unavailable; CI synthetic Linux smoke does not validate real-model RAM.
+The historical audit and preparation baseline below remain evidence, not activation instructions.
+
 Provider-neutral preparation only: **no public deployment is approved or performed**.
 No provider/account/domain was selected or provisioned, no paid resource was created and no
 tunnel, firewall, reverse proxy or n8n activation was performed.
@@ -133,8 +148,10 @@ Docker is unavailable locally: image build/run have static validation only. No c
 host port was started/published. The Docker command binds a private container port, not an
 approved public endpoint. Native build, dependency and real artifact smoke remain required.
 
-The provider must deliver the approved real model through private artifact deployment/storage
-and a **read-only runtime mount**. The service must not own or write the model/config root.
+The mount-based option delivers the approved real model through private artifact storage
+and a **read-only runtime mount**. The zero-cost option instead uses a verified private
+build-time bundle, root-owned and read-only to the runtime. The service must not own or
+write the model/config root in either production design.
 Use separate owner/admin permissions, no symlinks/reparse points or group/world-write bits,
 and only the necessary read access for the runtime UID. Configure MODEL_ARTIFACT_ROOT/PATH
 for that mount. Supply the approved manifest pin independently through protected configuration;
