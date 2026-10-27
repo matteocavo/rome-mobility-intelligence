@@ -32,5 +32,7 @@ def ready(request: Request):
             "artifact_integrity": "verified" if available else "not_verified",
             "workload_identity_configured": identity_configured,
             "databricks_readiness": "not_checked",
+            "database_configured": state.database.configured,
+            "prediction_persistence_enabled": state.settings.enable_prediction_persistence,
         },
     )

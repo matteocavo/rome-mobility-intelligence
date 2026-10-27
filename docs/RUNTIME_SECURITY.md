@@ -7,6 +7,18 @@ I controlli di readiness non aprono connessioni Databricks. [Contratto API](INFE
 Public deployment is NOT yet approved: rimane necessario un account OS servizio separato,
 senza ownership dello storage modello e senza accesso al credential store personale.
 
+## Persistence PostgreSQL opzionale
+
+Il trigger manual/local/internal richiede ENABLE_PREDICTION_PERSISTENCE=true (default false)
+e una DATABASE_URL privata; nessuna autenticazione Internet-facing viene dichiarata.
+Solo PostgreSQL riceve gli INSERT idempotenti, in transazione e con constraint DB reale.
+Pool bounded senza overflow, timeout di connessione/pool e statement/lock timeout di sessione;
+DSN SecretStr, SQL/parametri e diagnostica driver esclusi dai log/API.
+Nessun raw feature vector, target realizzato o identificativo utente persistito.
+Migration role e runtime role devono essere separati; runtime SELECT/INSERT senza DDL/superuser.
+F01–F06 restano attivi e nessuna query Databricks viene bypassata. Nessun OS service modificato.
+[Schema, test e validazione nativa ancora da eseguire](PREDICTION_HISTORY.md).
+
 ## Trust degli artifact
 
 L’app riceve MODEL_ARTIFACT_PATH, MODEL_ARTIFACT_ROOT e MODEL_ARTIFACT_MANIFEST_SHA256

@@ -1,7 +1,7 @@
 # Rome Mobility Intelligence
 
 API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
-Stato: **inference stateless sul modello reale e latest current scoring snapshot**, per review.
+Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**, per review.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
 Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
@@ -96,9 +96,20 @@ Il modello si carica una volta all'avvio tramite il loader trusted. La soglia vi
 (0.35 per il modello reale corrente), mai dalla richiesta. Le fixture sintetiche sono rifiutate
 dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query SQL.
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
-Non esistono prediction history, frontend o n8n. Autenticazione API e hosting sono fasi successive.
+Prediction history PostgreSQL è opzionale e disabilitata di default; nessun frontend o n8n.
+Autenticazione API e hosting sono fasi successive.
 Public deployment is NOT yet approved: serve un account OS di servizio separato, senza ownership
 dello storage modello e senza accesso al credential store personale dell'operatore.
+
+## Prediction history PostgreSQL
+
+`POST /predictions/current/persist?limit=50` abilita il trigger manuale soltanto con
+`ENABLE_PREDICTION_PERSISTENCE=true` e `DATABASE_URL` privata. Il batch corrente viene salvato
+atomicamente con unique constraint e ON CONFLICT; un secondo batch identico non duplica righe.
+`GET /predictions/history` consulta lo storico con filtri allowlist, max 200 righe e intervalli
+max 7 giorni. Preview e POST /predict restano stateless. Nessuna scrittura Databricks.
+Schema gestito da `alembic upgrade head`, mai creato automaticamente all'avvio.
+[Setup, idempotenza, sicurezza e smoke PostgreSQL da completare](docs/PREDICTION_HISTORY.md).
 
 ## Verifiche
 
@@ -121,7 +132,7 @@ delle API pandas/sklearn; non viene dichiarata copertura statica completa.
 1. Revisionare il primo artifact reale e il protocollo di valutazione.
 2. Acquisire nuove date TEST indipendenti e rivalidare prima del serving operativo.
 3. Accettare freshness, autenticazione e serving inference.
-4. Aggiungere prediction history, poi orchestrazione n8n.
+4. Completare lo smoke PostgreSQL locale della history opzionale, poi valutare orchestrazione.
 5. React e UX/UI con Google AI Studio, in una fase successiva.
 
 Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundation.

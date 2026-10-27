@@ -8,3 +8,5 @@ def configure_logging() -> None:
     logging.getLogger("databricks.sql").setLevel(logging.CRITICAL)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy").setLevel(logging.CRITICAL)
+    logging.getLogger("psycopg").setLevel(logging.CRITICAL)
