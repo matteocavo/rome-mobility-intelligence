@@ -129,17 +129,27 @@ def docker_smoke(pins):
             check=True,
             timeout=180,
         )
-        settings = json.loads((data / "config").read_text(encoding="utf-8"))
-        assert settings["encryptionKey"] == key.read_text(encoding="ascii")
         subprocess.run([*common, "unpublish:workflow", "--all"], check=True, timeout=180)
         subprocess.run(
             [*common, "export:workflow", "--all", "--output=/home/node/.n8n/export.json"],
             check=True,
             timeout=180,
         )
-        exported = json.loads((data / "export.json").read_text(encoding="utf-8"))
-        assert exported and all(w["active"] is False for w in exported)
-        assert all("credentials" not in n for w in exported for n in w["nodes"])
+        # Inspect private files as n8n's runtime UID, never relaxing their permissions.
+        verification = (
+            "const fs=require('fs');const assert=require('assert');"
+            "const settings=JSON.parse(fs.readFileSync('/home/node/.n8n/config','utf8'));"
+            "assert.strictEqual(settings.encryptionKey,"
+            "fs.readFileSync('/run/secrets/n8n_encryption_key','utf8'));"
+            "const workflows=JSON.parse(fs.readFileSync('/home/node/.n8n/export.json','utf8'));"
+            "assert(workflows.length>0 && workflows.every(w=>w.active===false));"
+            "assert(workflows.every(w=>w.nodes.every(n=>!('credentials' in n))));"
+        )
+        subprocess.run(
+            [*common[:-1], "--entrypoint", "node", pins[0], "-e", verification],
+            check=True,
+            timeout=60,
+        )
         # Delete private temporary state as its runtime UID; no backup/artifact upload.
         subprocess.run(
             [
