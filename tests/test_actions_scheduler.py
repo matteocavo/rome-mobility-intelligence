@@ -138,3 +138,40 @@ def test_workflow_is_gated_minimal_and_only_calls_reviewed_client():
     assert not any(
         s in text.lower() for s in ("databricks", "postgres", "printenv", "curl -v", "pip install")
     )
+
+
+def test_low_code_architecture_stays_pending_and_actions_is_fallback():
+    documents = [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/N8N_CLOUD_ORCHESTRATION.md",
+        "docs/SECURE_DEPLOYMENT.md",
+        "docs/ZERO_COST_DEPLOYMENT.md",
+        "docs/RUNTIME_SECURITY.md",
+    ]
+    for name in documents:
+        text = Path(name).read_text(encoding="utf-8")
+        assert "LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING" in text, name
+        assert "GitHub Actions: zero-cost fallback scheduler" in text, name
+        assert "0 EUR" in text, name
+        normalized = " ".join(text.lower().split())
+        for obsolete in (
+            "github actions is the production orchestrator",
+            "github actions is the proposed production orchestrator",
+            "optional / demo / user-provided external orchestrator",
+            "the production candidate uses github actions",
+        ):
+            assert obsolete not in normalized, name
+    for name in (
+        "app/integrations/n8n_client.py",
+        "ops/n8n/workflows/rome_mobility_orchestration.json",
+        "ops/n8n/workflows/rome_mobility_webhook_boundary.json",
+        "docs/N8N_CLOUD_ORCHESTRATION.md",
+    ):
+        assert Path(name).is_file()
+    zero_cost = Path("docs/ZERO_COST_DEPLOYMENT.md").read_text(encoding="utf-8")
+    assert "ZERO-COST LOW-CODE ORCHESTRATION SELECTION" in zero_cost
+    assert "No candidate is selected in this PR" in zero_cost
+    workflow = Path(".github/workflows/persist-current-predictions.yml").read_text(encoding="utf-8")
+    assert "zero-cost fallback" in workflow
+    assert "RMI_ORCHESTRATION_ENABLED == 'true'" in workflow

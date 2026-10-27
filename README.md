@@ -5,9 +5,12 @@ Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
 Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
-**P0: infrastruttura ricorrente a 0 EUR.** Il percorso production candidato usa
-GitHub Actions ogni 30 minuti -> FastAPI su Render Free -> Databricks Free / Neon Free.
-n8n resta **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**, senza essere necessario.
+**P0: infrastruttura ricorrente a 0 EUR.**
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Il progetto mantiene un layer
+low-code/no-code reale e significativo, principale se tecnicamente sostenibile a costo zero.
+**GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti e solo con opt-in.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+Una subscription n8n Cloud a pagamento non può essere un requisito obbligatorio.
 Delivery modello privata in build, gate Linux/RAM e opt-in schedule ancora da verificare
 prima di un deployment reale. [Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
 

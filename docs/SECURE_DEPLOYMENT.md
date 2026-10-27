@@ -2,9 +2,12 @@
 
 ## Zero-cost candidate (supersedes provider-selection gaps below)
 
-P0 is 0 EUR recurring owner infrastructure cost. GitHub Actions is the proposed production
-orchestrator; n8n is **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**. No deployment
-is performed. [Zero-cost design, exact setup and remaining gates](ZERO_COST_DEPLOYMENT.md)
+P0 requires both 0 EUR/month mandatory recurring owner infrastructure cost and a meaningful
+low-code/no-code layer, primary orchestrator when technically sustainable.
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**.
+**GitHub Actions: zero-cost fallback scheduler**; opt-in only, never automatically enabled.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+A paid n8n Cloud subscription cannot be mandatory. No deployment is performed. [Zero-cost design, exact setup and remaining gates](ZERO_COST_DEPLOYMENT.md)
 selects Render Free + Neon Free and private build-time delivery via Dockerfile.zero-cost.
 The original Dockerfile remains the mount-based alternative. Build secrets never enter
 layers; verified model files in the provider's private image are root-owned/read-only to

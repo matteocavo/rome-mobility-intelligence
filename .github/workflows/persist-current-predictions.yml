@@ -1,4 +1,4 @@
-name: Persist current predictions
+name: Persist current predictions (zero-cost fallback)
 on:
   schedule:
     # UTC, off the hour; change reviewed cron to change cadence. No keep-alive pings.
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   persist:
-    # Explicit operator opt-in; this PR never sets the variable or secrets.
+    # Zero-cost fallback scheduler only. Explicit operator opt-in; this PR never sets the variable or secrets.
     if: github.repository == 'matteocavo/rome-mobility-intelligence' && vars.RMI_ORCHESTRATION_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15

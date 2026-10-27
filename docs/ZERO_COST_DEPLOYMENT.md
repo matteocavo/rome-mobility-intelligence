@@ -8,23 +8,38 @@ billing, model uploads, production secrets or databases are created by this chan
 
 ## Target and activation boundary
 
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**.
+**GitHub Actions: zero-cost fallback scheduler**.
+
+A meaningful low-code/no-code layer is a P0 requirement alongside mandatory infrastructure
+cost of **0 EUR/month**. It should be the primary orchestrator if technically sustainable.
+The next task, **ZERO-COST LOW-CODE ORCHESTRATION SELECTION**, evaluates n8n Community,
+Make Free or equivalent before choosing. No candidate is selected in this PR.
+
 ```text
-GitHub Actions standard public-repository runner (30-minute real work trigger)
-  -> HTTPS + X-RMI-Service-Key -> Render Free FastAPI, Frankfurt, one worker
-       -> read-only OAuth M2M -> existing Databricks Free workspace
-       -> verify-full TLS -> Neon Free PostgreSQL, Frankfurt
+Databricks Free -> FastAPI -> PostgreSQL Free
+                     ^
+                     | HTTPS: authenticated operational orchestration
+LOW-CODE / NO-CODE ORCHESTRATOR (selection pending)
+  candidates: n8n Community / Make Free / equivalent
+
+Fallback only: GitHub Actions -> HTTPS FastAPI
+Future: Google AI Studio / public frontend -> FastAPI public/user-authenticated layer
 
 Private Neon Object Storage -> Render BuildKit secret -> bounded verified bundle
   -> root-owned model in Render's private built image -> trusted runtime loader
 ```
 
-GitHub Actions is the production orchestrator. n8n Cloud remains **OPTIONAL / DEMO /
-USER-PROVIDED EXTERNAL ORCHESTRATOR**; its code, inactive workflows and webhook boundary
-are retained. Do not run both schedulers concurrently against production. No n8n account,
-Admin API, PAT, direct database or warehouse credential belongs in the Actions workflow.
-Future frontend hosting must also be free; user auth remains separate from the service key.
+n8n is an **implemented candidate low-code integration; production role pending zero-cost
+selection**. Its client, inactive workflows, documentation, service authentication and
+webhook boundary remain intact. A paid n8n Cloud subscription cannot be required. Retool
+is not implemented or selected; it may be considered only as a future operational/admin UI.
+Do not run competing schedulers concurrently. No n8n account, Admin API, PAT, direct database
+or warehouse credential belongs in the Actions fallback. Future frontend hosting must also
+be free, with user auth separate from the service key. Orchestrator, Databricks, FastAPI,
+PostgreSQL and model storage/delivery each have a mandatory 0 EUR/month infrastructure target.
 
-The new workflow runs only on main and only after the operator sets repository variable
+The fallback workflow runs only on main and only after the operator sets repository variable
 `RMI_ORCHESTRATION_ENABLED=true`. This PR does neither. Required Actions repository secrets:
 `RMI_API_BASE_URL` (HTTPS origin only) and `RMI_SERVICE_API_KEY`. Never put the service key
 in a URL, logs, summary, repository variable, artifact or frontend. Checkout is necessary
@@ -35,7 +50,8 @@ between this workflow's runs, not with independent manual clients/n8n.
 
 ## Schedule and failure semantics
 
-Default cron `17,47 * * * *` UTC performs real persistence every 30 minutes. To change
+Fallback cron `17,47 * * * *` UTC performs real persistence every 30 minutes when explicitly enabled.
+This cadence does not select the future low-code production orchestrator or its schedule. To change
 cadence, review the cron in `.github/workflows/persist-current-predictions.yml`; GitHub cron
 does not interpolate repository variables. 15 minutes is not validated or required.
 At 30 minutes there are 1,440 triggers/30-day month (1,488/31-day month). GitHub may delay/drop
@@ -64,12 +80,13 @@ inheritance are disabled; response bodies are bounded to 64 KiB.
 
 | Component | Selected configuration | Owner recurring cost |
 | --- | --- | --- |
-| Actions | Standard ubuntu-latest, public repository, no uploaded artifacts/cache | 0 EUR |
+| Actions fallback | Standard ubuntu-latest, public repository, opt-in only | 0 EUR |
+| Primary low-code/no-code orchestrator | Selection pending; must meet zero-cost target | 0 EUR target |
 | Render | Hobby + Free web service; no payment method, no paid disk/compute | 0 EUR |
 | Neon PostgreSQL | Free only, one project, no paid upgrade | 0 EUR |
 | Neon Object Storage | Same Free project, private | 0 EUR |
 | Databricks | Existing Free workspace; no plan changes | 0 EUR (operator-provided existing plan) |
-| n8n Cloud | Optional external integration, not a production prerequisite | Not part of required stack |
+| n8n integration | Implemented candidate; production role pending selection; paid Cloud cannot be mandatory | 0 EUR mandatory target |
 
 Render Free: 512 MB RAM, 0.1 CPU, 750 shared instance hours/month, sleep after 15 minutes
 idle, approximately one-minute wake-up, ephemeral filesystem, no free persistent disk.
@@ -207,7 +224,9 @@ deletion, grants or database changes are implemented in this PR.
    provider-built image privacy and BuildKit behavior with a nonsecret synthetic source first.
 3. Separately authorized private model upload, production DB/TLS/roles and scoped secrets;
    real read-only source + idempotent persistence smoke; retention/backup operational choice.
-4. Set Actions secrets and opt-in variable only after secure deployment; do not activate n8n.
+4. Complete ZERO-COST LOW-CODE ORCHESTRATION SELECTION before selecting the primary
+   orchestrator. Configure Actions secrets/opt-in only if fallback use is explicitly chosen
+   after secure deployment. Neither Actions nor n8n is activated by this PR.
 
 ## Official references (checked 2026-10-27)
 

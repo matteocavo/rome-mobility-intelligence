@@ -1,11 +1,14 @@
 # n8n Cloud orchestration
 
-**OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR.** n8n Cloud is not required for
-zero-cost production. The production candidate uses GitHub Actions every 30 minutes,
-with bounded cold-start handling and the same service-authenticated FastAPI boundary.
-Existing n8n code, inactive exports and webhook boundary are retained; account/workflows
-are not activated. The n8n 15-minute example below is optional and is not the production
-cadence. Do not enable both orchestrators concurrently. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. n8n is an
+implemented candidate low-code integration; production role pending zero-cost selection.
+A meaningful low-code/no-code layer remains required, with the primary orchestration role
+when technically sustainable at 0 EUR/month. A paid n8n Cloud subscription cannot be mandatory.
+**GitHub Actions: zero-cost fallback scheduler**, opt-in only, with bounded cold-start handling.
+Existing n8n code, inactive exports, service authentication and webhook boundary are retained;
+accounts/workflows are not activated. The 15-minute example is not a selected production
+cadence. Do not enable concurrent orchestrators. No n8n Community, Make or Retool selection
+is made here; evaluate candidates in ZERO-COST LOW-CODE ORCHESTRATION SELECTION. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
 
 ## FastAPI service authentication
 

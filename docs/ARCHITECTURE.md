@@ -2,11 +2,25 @@
 
 ## Decisione P0: costo ricorrente zero
 
-Produzione candidata: **GitHub Actions -> HTTPS FastAPI -> Databricks / PostgreSQL**.
-Trigger iniziale ogni 30 minuti, disabilitato fino a opt-in esplicito, senza ping keep-alive.
-n8n Cloud e i suoi workflow rimangono **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**.
-Non occorre n8n per il percorso production e non va attivato contemporaneamente allo schedule
-Actions. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
+**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Un layer low-code/no-code reale
+e significativo resta requisito P0; sara orchestratore principale se sostenibile a costo zero.
+**GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti, opt-in e senza keep-alive.
+n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+Non attivare orchestratori concorrenti sullo stesso percorso. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
+
+```text
+Databricks Free -> FastAPI -> PostgreSQL Free
+                     ^
+LOW-CODE / NO-CODE ORCHESTRATOR (selection pending)
+                     | operational orchestration via authenticated HTTPS
+
+Fallback: GitHub Actions -> FastAPI
+Future: Google AI Studio / public frontend -> FastAPI public/user-authenticated layer
+```
+
+Prossima task: **ZERO-COST LOW-CODE ORCHESTRATION SELECTION**. Nessuna scelta tra n8n
+Community, Make Free o equivalenti in questa PR. Frontend, orchestratore, storage modello,
+FastAPI, PostgreSQL e Databricks mantengono ciascuno il target obbligatorio di 0 EUR/month.
 
 ## Preparazione deployment
 
@@ -112,7 +126,7 @@ per preview e BatchScoringService. Solo il trigger manuale abilitato esplicitame
 PostgreSQL tramite PredictionHistoryRepository. Database gestisce engine/pool/sessioni,
 models definisce lo schema e Alembic applica le migrazioni fuori dal runtime HTTP.
 La history API legge soltanto PostgreSQL, con filtri e range bounded. Nessun SQL business nelle
-route, salvataggio implicito, scheduler attivo o frontend. n8n è soltanto un client opzionale
+route, salvataggio implicito, scheduler attivo o frontend. n8n e un candidato layer low-code implementato
 di questi endpoint. [Disegno e limiti](PREDICTION_HISTORY.md).
 
 ## Orchestratore n8n Cloud
