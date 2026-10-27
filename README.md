@@ -192,3 +192,12 @@ obbligatori se si configura un modello. La copia in artifacts/ resta staging sto
 servita locale è fuori da OneDrive, in storage con ACL restrittive. Un clone non include la pin
 né il modello. Query: deadline 120s, coda massima 1s, un solo worker SQL per warehouse/processo,
 STATEMENT_TIMEOUT di sessione e LIMIT server-side. [Dettagli e limiti](docs/RUNTIME_SECURITY.md).
+
+## License and Data Attribution
+
+Original source code is Open Source under the [Apache License 2.0](LICENSE).
+Copyright 2026 Matteo Cavo.
+
+Third-party components and public transport data remain under their applicable
+upstream licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for Roma
+data attribution, licensing exceptions and the scope of the original work.
