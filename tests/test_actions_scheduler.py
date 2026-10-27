@@ -140,7 +140,7 @@ def test_workflow_is_gated_minimal_and_only_calls_reviewed_client():
     )
 
 
-def test_low_code_architecture_stays_pending_and_actions_is_fallback():
+def test_low_code_architecture_is_community_oci_and_actions_is_fallback():
     documents = [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -151,7 +151,9 @@ def test_low_code_architecture_stays_pending_and_actions_is_fallback():
     ]
     for name in documents:
         text = Path(name).read_text(encoding="utf-8")
-        assert "LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING" in text, name
+        assert "n8n Community Edition on OCI Always Free" in text, name
+        assert "SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED" in text, name
+        assert "ONLY ONE scheduler active at a time" in text, name
         assert "GitHub Actions: zero-cost fallback scheduler" in text, name
         assert "0 EUR" in text, name
         normalized = " ".join(text.lower().split())
@@ -170,8 +172,8 @@ def test_low_code_architecture_stays_pending_and_actions_is_fallback():
     ):
         assert Path(name).is_file()
     zero_cost = Path("docs/ZERO_COST_DEPLOYMENT.md").read_text(encoding="utf-8")
-    assert "ZERO-COST LOW-CODE ORCHESTRATION SELECTION" in zero_cost
-    assert "No candidate is selected in this PR" in zero_cost
+    assert "Make Free is second choice at degraded" in zero_cost
+    assert "No candidate is selected in this PR" not in zero_cost
     workflow = Path(".github/workflows/persist-current-predictions.yml").read_text(encoding="utf-8")
     assert "zero-cost fallback" in workflow
     assert "RMI_ORCHESTRATION_ENABLED == 'true'" in workflow

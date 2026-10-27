@@ -1,0 +1,18 @@
+{
+  "verified_at": "2026-10-27",
+  "method": "Anonymous Docker Registry v2 manifest-list/index GET; no image published",
+  "images": [
+    {
+      "repository": "n8nio/n8n",
+      "version": "2.45.4",
+      "index_digest": "sha256:80e23ced901f0e22597d4f3464e3aaf9d835372262ea6f08ef760d8ca35df25c",
+      "linux_arm64_digest": "sha256:145ce8ea58584747b4793456422c71cdedf98ae8c476c7d2519b1d5ef1a4073c"
+    },
+    {
+      "repository": "library/caddy",
+      "version": "2.11.7-alpine",
+      "index_digest": "sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f",
+      "linux_arm64_digest": "sha256:cc447f149425221422153c6cdf33a123b3f458839679f950298f68a690a54a5b"
+    }
+  ]
+}

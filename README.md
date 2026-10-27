@@ -1,15 +1,18 @@
 # Rome Mobility Intelligence
 
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
 API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
 Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**, per review.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
 Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 **P0: infrastruttura ricorrente a 0 EUR.**
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Il progetto mantiene un layer
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. Il progetto mantiene un layer
 low-code/no-code reale e significativo, principale se tecnicamente sostenibile a costo zero.
 **GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti e solo con opt-in.
-n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+n8n: primary low-code integration; selected and prepared, not yet provisioned.
 Una subscription n8n Cloud a pagamento non può essere un requisito obbligatorio.
 Delivery modello privata in build, gate Linux/RAM e opt-in schedule ancora da verificare
 prima di un deployment reale. [Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
@@ -120,14 +123,14 @@ max 7 giorni. Preview e POST /predict restano stateless. Nessuna scrittura Datab
 Schema gestito da `alembic upgrade head`, mai creato automaticamente all'avvio.
 [Setup, idempotenza, sicurezza e validazione PostgreSQL nativa](docs/PREDICTION_HISTORY.md).
 
-## Orchestrazione n8n Cloud
+## Orchestrazione n8n Community
 
-Target: n8n Cloud, con workflow importabili manualmente e inattivi in [ops/n8n](ops/n8n/README.md).
-Schedule ogni 15 minuti, retry selettivi e summary compatti; webhook separato con Header Auth.
+Primary: n8n Community su OCI Always Free, con workflow importabili e inattivi in [ops/n8n](ops/n8n/README.md).
+Schedule ogni 30 minuti, cold-start wait/retry finiti e summary compatti; webhook separato con Header Auth.
 Il client server-side FastAPI usa soltanto URL HTTPS configurata, host esplicitamente fidato,
-secret privato e payload minimo. Nessuna n8n Admin API/key, Docker o installazione n8n locale.
+secret privato e payload minimo. Nessuna n8n Admin API/key; Compose OCI preparato ma nessun container reale avviato.
 [Import, autenticazione e confini](docs/N8N_CLOUD_ORCHESTRATION.md).
-Lo smoke Cloud resta pending: n8n Cloud non può raggiungere in sicurezza il FastAPI locale.
+Lo smoke end-to-end resta pending: n8n Cloud non può raggiungere in sicurezza il FastAPI locale.
 Nessun deploy pubblico o tunnel è approvato o creato.
 
 ## Verifiche

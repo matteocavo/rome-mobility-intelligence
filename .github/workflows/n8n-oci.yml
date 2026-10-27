@@ -1,0 +1,14 @@
+name: n8n OCI deployment checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: ARM64 images, Compose syntax, Caddy validation, inactive n8n import
+        run: python3 -m scripts.validate_n8n_oci --docker

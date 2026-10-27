@@ -1,14 +1,16 @@
-# n8n Cloud orchestration
+# n8n Community primary orchestration and Cloud compatibility
 
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. n8n is an
-implemented candidate low-code integration; production role pending zero-cost selection.
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](../ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. n8n is an
+primary low-code integration; selected and prepared, not yet provisioned.
 A meaningful low-code/no-code layer remains required, with the primary orchestration role
-when technically sustainable at 0 EUR/month. A paid n8n Cloud subscription cannot be mandatory.
+on the approved OCI Always Free target at 0 EUR/month. A paid n8n Cloud subscription cannot be mandatory.
 **GitHub Actions: zero-cost fallback scheduler**, opt-in only, with bounded cold-start handling.
 Existing n8n code, inactive exports, service authentication and webhook boundary are retained;
-accounts/workflows are not activated. The 15-minute example is not a selected production
-cadence. Do not enable concurrent orchestrators. No n8n Community, Make or Retool selection
-is made here; evaluate candidates in ZERO-COST LOW-CODE ORCHESTRATION SELECTION. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
+accounts/workflows are not activated. The primary workflow now uses 30 minutes. Do not enable concurrent orchestrators. Primary is n8n Community on OCI Always Free; Make is secondary at degraded cadence.
+Retool is only a possible future operations UI. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
 
 ## FastAPI service authentication
 
@@ -20,14 +22,16 @@ Operational endpoints and full /ready require service auth. Anonymous /ready is 
 cannot satisfy the workflow guard. Never give the service credential to the frontend.
 [Production configuration and remaining HTTPS gate](SECURE_DEPLOYMENT.md).
 
-Target workspace: `m-cavo.app.n8n.cloud`. The operator imports/configures workflows manually.
+Primary target: self-hosted Community on OCI. Existing Cloud workspace `m-cavo.app.n8n.cloud`
+remains untouched for development/manual use; the import instructions also apply there. The operator imports/configures workflows manually.
 This implementation does not access the account and never asks for an administrative API key.
-There are no n8n Admin API calls, Docker Compose files, global npm installs or local n8n service.
+There are no n8n Admin API calls, global npm installs or running local n8n service.
+Minimal OCI Compose assets are prepared separately and not deployed.
 
 ## Two independent flows, no callback loop
 
 `Rome Mobility - Prediction Orchestration` is the main manual/schedule template:
-15-minute Schedule Trigger → trusted FastAPI Configuration → health/ready checks →
+30-minute Schedule Trigger → trusted FastAPI Configuration → health/ready checks →
 POST /predictions/current/persist?limit=100 → inspect response →
 GET /predictions/history?limit=10 → compact summary.
 The workflow is inactive/unpublished by default, timezone Europe/Rome. API timestamps remain UTC.
@@ -86,7 +90,7 @@ workflow actions; the workflow then rejects extra payload fields and malformed i
    field to the future secure HTTPS backend base URL, without trailing slash/path prefix.
    It is empty by default and the graph rejects missing, local or placeholder destinations
    before any HTTP call. This Set-node configuration works without plan-dependent Cloud variables.
-4. Do not publish the schedule. Confirm the 15-minute interval and Europe/Rome timezone.
+4. Do not publish the schedule. Confirm the 30-minute interval and Europe/Rome timezone.
    Bind the dedicated API Header Auth credential to every HTTP node before execution;
    never use the n8n administrative key or reuse the webhook secret as backend auth.
 5. Create/import a second workflow using
@@ -116,24 +120,16 @@ input; this graph guard is not a general network firewall or DNS-rebinding defen
 
 ## Ready checks, retry and summaries
 
-Health must return 200/status=ok. Ready must return 200 plus model_ready=true,
-artifact_integrity=verified, workload_identity_configured=true, database_configured=true and
-prediction_persistence_enabled=true. A failure stops with a controlled summary, no readiness
-retry and no write. These configuration flags do not establish a new source freshness SLA.
-
-Persistence is POST without body, limit=100. Only HTTP 503/504 retry, at most twice, after
-30 then 60 seconds. HTTP 422 and other statuses do not retry; transport failures stop safely.
-Built-in indiscriminate HTTP retry is disabled. Persistence request timeout is 140 seconds;
-health/ready/history use ten seconds, with a 600-second workflow deadline. FastAPI retains its
-independent SQL deadline, cancellation request and concurrency budgets. Cancellation requests
-are not a guarantee of immediate remote termination.
-
-A confirmed write is followed by ten history rows at most. History failure yields
-history_followup_failed with persistence_succeeded=true and the confirmed write counts;
-it never repeats the write. Same source/model replay with inserted=0/existing=N is success_idempotent,
-not a failure. Deduplication remains the backend PostgreSQL constraint. A later retry can see
-a newer current source feed; the summary reports the successful watermark and does not claim
-exactly-once delivery or a frozen source snapshot.
+Health and authenticated readiness each have up to three 15-second attempts with visual
+Wait 30/45 seconds nodes (about 120 seconds per stage). The graph is acyclic with explicit
+attempt counters. Readiness requires status=ready and all five flags: model_ready,
+artifact_integrity=verified, workload_identity_configured, database_configured and
+prediction_persistence_enabled. No persistence occurs before readiness is confirmed.
+Persistence retries only 503/504 or recognized timeout, at most twice after 30/60 seconds;
+other transport errors and 400/401/403/413/422 stop. POST timeout is 140 seconds; workflow
+limit is 840 seconds. Optional FETCH_HISTORY can skip the final GET. History failure after
+confirmed persistence cannot repeat the write; zero inserted/all existing is success.
+Native error shapes/cold starts still require a controlled live smoke after provisioning.
 
 Final summary contains UTC execution timestamp, source watermark, evaluated/inserted/existing,
 model version, threshold, history row count, status, retry count, HTTP status and confirmation

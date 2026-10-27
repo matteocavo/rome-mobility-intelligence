@@ -51,5 +51,14 @@ venv/
 *.avro
 *.pickle
 *.pkl
+*.gpg
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.tar
+*.tar.gz
+*.tgz
 /artifacts/*
 !/artifacts/.gitkeep

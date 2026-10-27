@@ -1,11 +1,14 @@
 # Runtime security: artifact trust e query budgets
 
+**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
+[OCI deployment and backup runbooks](../ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+
 ## Runtime candidato a costo zero
 
-**LOW-CODE/NO-CODE ORCHESTRATOR: SELECTION PENDING**. Il layer low-code/no-code resta
+**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. Il layer low-code/no-code resta
 requisito P0 insieme al costo obbligatorio di 0 EUR/month.
 **GitHub Actions: zero-cost fallback scheduler**, opt-in con sole chiamate HTTPS FastAPI.
-n8n: implemented candidate low-code integration; production role pending zero-cost selection.
+n8n: primary low-code integration; selected and prepared, not yet provisioned.
 La delivery preferita usa BuildKit secrets durante la build privata Render: manifest pin
 indipendente, download/extraction bounded, pubblicazione atomica e loader F02 invariato.
 Root/file del modello appartengono a root, runtime UID 10001 legge soltanto. Il bootstrap
@@ -32,7 +35,7 @@ Header Auth nativo va configurato manualmente sul Webhook Cloud prima di utilizz
 l'export omette riferimenti/valori credential. Il workflow ACK non richiama FastAPI.
 Lo schedule separato è inattivo e chiama solo endpoint FastAPI configurati, con retry bounded.
 Dati di esecuzione disabilitati, summary senza righe complete, nessuna credential DB/Databricks.
-Nessun Docker, listener, tunnel o deploy pubblico. [Confini e setup](N8N_CLOUD_ORCHESTRATION.md).
+Compose OCI preparato; nessun container, listener, tunnel o deploy pubblico avviato. [Confini e setup](N8N_CLOUD_ORCHESTRATION.md).
 
 L'API inference stateless estende questi stessi controlli, senza loader o connector paralleli.
 Schema HTTP chiuso per le 47 feature, nessun override di path/threshold/SQL e max batch 100.
