@@ -5,6 +5,12 @@ Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
 Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
+**P0: infrastruttura ricorrente a 0 EUR.** Il percorso production candidato usa
+GitHub Actions ogni 30 minuti -> FastAPI su Render Free -> Databricks Free / Neon Free.
+n8n resta **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**, senza essere necessario.
+Delivery modello privata in build, gate Linux/RAM e opt-in schedule ancora da verificare
+prima di un deployment reale. [Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
+
 Il [repository Data/ML](https://github.com/matteocavo/rome-public-transport-reliability)
 rimane la sorgente di ingestion GTFS/GTFS-RT, Bronze/Silver, enrichment, feature engineering,
 Gold, qualità dati e dashboard. Spark ML è un riferimento storico. Questo repository

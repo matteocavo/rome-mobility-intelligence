@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     model_artifact_path: Path | None = None
     model_artifact_root: Path | None = None
     model_artifact_manifest_sha256: str = ""
+    model_bootstrap_enabled: bool = False
+    model_artifact_source_url: SecretStr = SecretStr("")
+    model_artifact_source_host: str = ""
+    model_artifact_source_auth: SecretStr = SecretStr("")
+    model_artifact_max_bytes: int = Field(default=33554432, ge=1, le=33554432)
+    model_artifact_download_timeout_seconds: float = Field(default=60, gt=0, le=120)
     databricks_query_timeout_seconds: float = Field(default=120, ge=0.05, le=600)
     databricks_queue_timeout_seconds: float = Field(default=1, ge=0, le=10)
     databricks_max_concurrent_queries: int = Field(default=1, ge=1, le=4)

@@ -1,5 +1,12 @@
 # n8n Cloud orchestration
 
+**OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR.** n8n Cloud is not required for
+zero-cost production. The production candidate uses GitHub Actions every 30 minutes,
+with bounded cold-start handling and the same service-authenticated FastAPI boundary.
+Existing n8n code, inactive exports and webhook boundary are retained; account/workflows
+are not activated. The n8n 15-minute example below is optional and is not the production
+cadence. Do not enable both orchestrators concurrently. [Zero-cost design](ZERO_COST_DEPLOYMENT.md).
+
 ## FastAPI service authentication
 
 All HTTP Request nodes require Generic Credential Type → Header Auth, configured manually

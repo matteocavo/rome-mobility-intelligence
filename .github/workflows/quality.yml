@@ -27,3 +27,8 @@ jobs:
       - run: pytest -q
       - run: python -m scripts.check_repository
       - run: git diff --check
+      - name: Linux Docker offline smoke (synthetic bundle only)
+        if: matrix.python-version == '3.12'
+        env:
+          RMI_CONTAINER_SMOKE: '1'
+        run: pytest tests/test_linux_container.py -q -s

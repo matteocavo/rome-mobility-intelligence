@@ -1,5 +1,13 @@
 # Architettura
 
+## Decisione P0: costo ricorrente zero
+
+Produzione candidata: **GitHub Actions -> HTTPS FastAPI -> Databricks / PostgreSQL**.
+Trigger iniziale ogni 30 minuti, disabilitato fino a opt-in esplicito, senza ping keep-alive.
+n8n Cloud e i suoi workflow rimangono **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**.
+Non occorre n8n per il percorso production e non va attivato contemporaneamente allo schedule
+Actions. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
+
 ## Preparazione deployment
 
 Tutti gli endpoint dati/inference sono ora service-to-service con X-RMI-Service-Key;
@@ -7,7 +15,8 @@ il frontend futuro richiede un'autenticazione utenti separata e non riceve quest
 HttpSecurity applica auth prima del body, budget globali bounded per classe, limiti byte,
 Host allowlist, header e log minimizzati. CORS è vuoto di default; forwarded headers non
 sono trusted. /health è liveness e /ready anonima è ridotta; i dettagli sono protetti.
-Container non-root provider-neutral, modello su mount read-only con digest esterno, un solo
+Container non-root provider-neutral, modello read-only (mount o immagine privata root-owned)
+con digest esterno, un solo
 worker. Nessun provider o deployment effettivo. [Audit e requisiti](SECURE_DEPLOYMENT.md).
 
 ## Confini

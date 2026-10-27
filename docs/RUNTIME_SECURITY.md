@@ -1,5 +1,15 @@
 # Runtime security: artifact trust e query budgets
 
+## Runtime candidato a costo zero
+
+Il trigger production previsto e' GitHub Actions, con service key privata e sole chiamate
+HTTPS FastAPI; n8n resta **OPTIONAL / DEMO / USER-PROVIDED EXTERNAL ORCHESTRATOR**.
+La delivery preferita usa BuildKit secrets durante la build privata Render: manifest pin
+indipendente, download/extraction bounded, pubblicazione atomica e loader F02 invariato.
+Root/file del modello appartengono a root, runtime UID 10001 legge soltanto. Il bootstrap
+runtime alternativo e' disabilitato di default e non risolve l'egress a ogni cold start.
+Nessun secret o artifact reale in Git/image pubblica/Actions artifact. [Limiti](ZERO_COST_DEPLOYMENT.md).
+
 ## HTTP e deployment
 
 X-RMI-Service-Key protegge tutte le route operative in ogni ambiente. N8N_SERVICE_API_KEY è

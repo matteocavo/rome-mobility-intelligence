@@ -1,0 +1,28 @@
+name: Persist current predictions
+on:
+  schedule:
+    # UTC, off the hour; change reviewed cron to change cadence. No keep-alive pings.
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: persist-current-predictions
+  cancel-in-progress: false
+jobs:
+  persist:
+    # Explicit operator opt-in; this PR never sets the variable or secrets.
+    if: github.repository == 'matteocavo/rome-mobility-intelligence' && vars.RMI_ORCHESTRATION_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Checkout is needed for the reviewed, tested stdlib client; no dependencies.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Warm up, require readiness, persist idempotently
+        env:
+          RMI_API_BASE_URL: ${{ secrets.RMI_API_BASE_URL }}
+          RMI_SERVICE_API_KEY: ${{ secrets.RMI_SERVICE_API_KEY }}
+          RMI_FETCH_HISTORY: 'false'
+        run: python3 -m scripts.persist_current_predictions

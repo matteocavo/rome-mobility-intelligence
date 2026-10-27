@@ -1,6 +1,7 @@
-# Deny build context by default; model and credentials arrive through protected runtime mounts.
+# Deny context by default; private models arrive via trusted mounts or BuildKit secrets.
 **
 !Dockerfile
+!Dockerfile.zero-cost
 !requirements-runtime.txt
 !app/
 !app/**
@@ -8,6 +9,7 @@
 !scripts/__init__.py
 !scripts/serve.py
 !scripts/healthcheck.py
+!scripts/bootstrap_model.py
 **/__pycache__/**
 **/.env*
 **/.databricks/**

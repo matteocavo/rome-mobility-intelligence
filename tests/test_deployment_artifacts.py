@@ -49,6 +49,18 @@ def test_container_only_packages_code_with_immutable_nonroot_runtime():
     assert not Path("ops/n8n/compose.yml").exists()
 
 
+def test_zero_cost_build_keeps_secrets_out_of_layers_and_model_private():
+    docker = Path("Dockerfile.zero-cost").read_text(encoding="utf-8")
+    assert "id=model-bootstrap_json,required=true" in docker
+    assert "id=model-manifest_sha256,required=true" in docker
+    assert "python -m scripts.bootstrap_model" in docker
+    assert "COPY --from=builder /opt/rmi-model /opt/rmi-model" in docker
+    assert "USER 10001:10001" in docker and "MODEL_BOOTSTRAP_ENABLED=false" in docker
+    assert not any(line.startswith("ARG ") for line in docker.splitlines())
+    assert "COPY /run/secrets" not in docker and "COPY artifacts" not in docker
+    assert "ghcr.io" not in docker and "docker push" not in docker
+
+
 def test_production_server_one_worker_no_forwarded_trust(monkeypatch):
     from scripts import serve
 

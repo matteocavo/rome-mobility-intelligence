@@ -34,6 +34,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.initialized = False
         if cfg.model_artifact_path:
             try:
+                if cfg.model_bootstrap_enabled:
+                    from app.core.artifact_bootstrap import Source, bootstrap
+
+                    bootstrap(
+                        Source(
+                            cfg.model_artifact_source_url.get_secret_value(),
+                            cfg.model_artifact_source_host,
+                            cfg.model_artifact_source_auth.get_secret_value(),
+                            cfg.model_artifact_max_bytes,
+                            cfg.model_artifact_download_timeout_seconds,
+                        ),
+                        cfg.model_artifact_path,
+                        root=cfg.model_artifact_root,
+                        digest=cfg.model_artifact_manifest_sha256,
+                    )
                 app.state.model = ModelService(
                     cfg.model_artifact_path,
                     trusted_root=cfg.model_artifact_root,
