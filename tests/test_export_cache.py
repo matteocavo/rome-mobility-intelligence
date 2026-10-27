@@ -29,7 +29,13 @@ def export_cache(tmp_path, frame):
         },
     }
     (tmp_path / "export-manifest.json").write_text(json.dumps(manifest))
-    return tmp_path, {"version": 12, "temporal_plan": asdict(FIXTURE_PLAN)}
+    return tmp_path, {
+        "version": 12,
+        "temporal_plan": asdict(FIXTURE_PLAN),
+        "export_manifest_sha256": hashlib.sha256(
+            (tmp_path / "export-manifest.json").read_bytes()
+        ).hexdigest(),
+    }
 
 
 def test_load_exact_export_without_credentials(export_cache):
@@ -54,3 +60,36 @@ def test_cache_protocol_fail_closed(export_cache, bad):
             seed=43 if bad == "seed" else 42,
             code_sha="wrong" if bad == "code_sha" else "fixture-code",
         )
+
+
+def test_cache_requires_independent_manifest_pin(export_cache, monkeypatch):
+    from unittest.mock import MagicMock
+
+    from app.data import export_cache as module
+
+    path, config = export_cache
+    config.pop("export_manifest_sha256")
+    decode = MagicMock()
+    monkeypatch.setattr(module.joblib, "load", decode)
+    with pytest.raises(ValueError, match="out-of-band"):
+        load_export(path, config=config, seed=42, code_sha="fixture-code")
+    decode.assert_not_called()
+
+
+def test_recomputed_cache_and_manifest_cannot_replace_external_pin(export_cache, monkeypatch):
+    from unittest.mock import MagicMock
+
+    from app.data import export_cache as module
+
+    path, config = export_cache
+    (path / "partitions.joblib").write_bytes(b"untrusted replacement")
+    manifest = json.loads((path / "export-manifest.json").read_text())
+    manifest["cached_export_sha256"] = hashlib.sha256(
+        (path / "partitions.joblib").read_bytes()
+    ).hexdigest()
+    (path / "export-manifest.json").write_text(json.dumps(manifest))
+    decode = MagicMock()
+    monkeypatch.setattr(module.joblib, "load", decode)
+    with pytest.raises(ValueError, match="External"):
+        load_export(path, config=config, seed=42, code_sha="fixture-code")
+    decode.assert_not_called()

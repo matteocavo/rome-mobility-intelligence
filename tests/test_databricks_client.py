@@ -57,7 +57,10 @@ def test_select_parameters_and_cleanup():
         "SELECT :v AS value", {"v": 1}, max_rows=2
     )
     assert result.value.tolist() == [1, 2]
-    cursor.execute.assert_any_call("SELECT :v AS value", parameters={"v": 1})
+    query_call = cursor.execute.call_args
+    assert "LIMIT :__rmi_row_limit" in query_call.args[0]
+    assert query_call.kwargs["parameters"] == {"v": 1, "__rmi_row_limit": 3}
+    assert connect.call_args.kwargs["session_configuration"]["STATEMENT_TIMEOUT"] == "120"
     assert "access_token" not in connect.call_args.kwargs
     connection.close.assert_called_once()
     cursor.close.assert_called_once()

@@ -78,3 +78,14 @@ OAuth M2M ora usa `DATABRICKS_CLIENT_ID` e una sola fonte del secret: environmen
 è rinnovato in memoria; ogni connessione verifica l’identità prima delle SELECT.
 [Permessi e verifica runtime](WORKLOAD_IDENTITY.md). Quota Free, isolamento host, autenticazione API
 e deployment restano controlli separati. I test CI usano mock/fixture senza credenziali.
+
+## Budget SQL applicativi e server
+
+Il client applica un deadline comprendente connessione, autenticazione, identità, esecuzione
+e fetch dopo l’ammissione; la coda ha un proprio limite. Scaduto il deadline richiede cursor.cancel()
+da un thread separato e restituisce errore senza attendere un cancel bloccato. Lo slot resta
+occupato fino alla chiusura effettiva del worker. Sessione STATEMENT_TIMEOUT e LIMIT esterno
+max_rows+1 sono backstop server-side; i byte sono limitati anche durante il fetch pandas.
+Non sono limiti di configurazione del warehouse e non ne cambiano schedule o impostazioni.
+Il controllo concorrenza è per processo: più worker richiedono un gate coordinato a deployment.
+[Trust, cancel e limiti](RUNTIME_SECURITY.md).

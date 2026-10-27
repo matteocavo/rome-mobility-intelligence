@@ -1,7 +1,9 @@
 """Load only trusted local bundles: joblib is executable pickle, not an exchange format."""
 
 import hashlib
+import io
 import json
+import re
 from pathlib import Path
 
 import joblib
@@ -11,6 +13,7 @@ from sklearn.pipeline import Pipeline
 
 from app.contracts.operational_ml import CONTRACT, FEATURES, contract_digest
 from app.contracts.schemas import ArtifactMetadata
+from app.core.trusted_files import trusted_bytes
 
 
 def persist(path: Path, pipeline: Pipeline, metadata: ArtifactMetadata) -> None:
@@ -26,21 +29,33 @@ def persist(path: Path, pipeline: Pipeline, metadata: ArtifactMetadata) -> None:
     (path / "checksums.json").write_text(json.dumps(checksums, indent=2), encoding="utf-8")
 
 
-def load(path: Path) -> tuple[Pipeline, ArtifactMetadata]:
-    checksums = json.loads((path / "checksums.json").read_text(encoding="utf-8"))
+def load(
+    path: Path, *, trusted_root: Path, expected_manifest_sha256: str
+) -> tuple[Pipeline, ArtifactMetadata]:
+    if trusted_root is None or not re.fullmatch(r"[a-f0-9]{64}", expected_manifest_sha256):
+        raise ValueError("An external trusted root and manifest digest are required")
+    manifest = trusted_bytes(path / "checksums.json", root=trusted_root, max_bytes=65536)
+    if hashlib.sha256(manifest).hexdigest() != expected_manifest_sha256:
+        raise ValueError("External manifest checksum mismatch")
+    checksums = json.loads(manifest)
     if set(checksums) != {"pipeline.joblib", "metadata.json", "contract.json"}:
         raise ValueError("Incomplete artifact manifest")
+    payloads = {}
     for name, checksum in checksums.items():
-        if hashlib.sha256((path / name).read_bytes()).hexdigest() != checksum:
+        if not isinstance(checksum, str) or not re.fullmatch(r"[a-f0-9]{64}", checksum):
+            raise ValueError("Invalid artifact checksum")
+        payloads[name] = trusted_bytes(path / name, root=trusted_root, max_bytes=64_000_000)
+        if hashlib.sha256(payloads[name]).hexdigest() != checksum:
             raise ValueError("Artifact checksum mismatch")
-    metadata = ArtifactMetadata.model_validate_json((path / "metadata.json").read_text())
+    metadata = ArtifactMetadata.model_validate_json(payloads["metadata.json"])
     if metadata.contract_digest != contract_digest():
         raise ValueError("Contract mismatch")
-    if json.loads((path / "contract.json").read_text(encoding="utf-8")) != CONTRACT:
+    if json.loads(payloads["contract.json"]) != CONTRACT:
         raise ValueError("Unexpected full feature contract")
     if metadata.sklearn_version != sklearn.__version__:
         raise ValueError("Use the exact training sklearn version to reload")
-    pipeline = joblib.load(path / "pipeline.joblib")
+    # Deserialize exactly the bytes already checked, never reopen the path (TOCTOU).
+    pipeline = joblib.load(io.BytesIO(payloads["pipeline.joblib"]))
     if not isinstance(pipeline, Pipeline) or tuple(pipeline.feature_names_in_) != FEATURES:
         raise ValueError("Invalid pipeline feature names")
     if list(pipeline.classes_) != [0, 1]:
