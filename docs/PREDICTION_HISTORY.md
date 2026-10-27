@@ -142,18 +142,35 @@ downgrade, then drops only that test schema. The test role needs schema creation
 never use a production database or the future restricted application role for this test.
 Non-loopback targets are rejected. Without explicit opt-in this test is skipped.
 
-At implementation time PostgreSQL 16 was installed but stopped, with no DATABASE_URL configured.
-No service was started or changed. Real PostgreSQL and Databricks→PostgreSQL smoke remain a
-manual follow-up: provision the private local test DB, migrate, enable writes, persist at most
-100 current rows, repeat while the feed/model are unchanged, and check inserted=0/existing=batch.
-Do not version prediction rows. Until that native validation is run, no real DB runtime PASS
-or real end-to-end persistence result is claimed.
+At implementation time (PR #15), PostgreSQL 16 was installed but stopped, with no DATABASE_URL
+configured. No service was started or changed in that PR; native validation was deferred.
+The later dated validation below completes that follow-up. For future local validation,
+provision a private test DB, migrate, enable writes, persist at most 100 current rows and
+repeat while the feed/model are unchanged, checking inserted=0/existing=batch.
+Do not version prediction rows.
 
-Validation for this PR: baseline 149 passed / 2 skipped; final Windows suite 193 passed /
+Validation for PR #15: baseline 149 passed / 2 skipped; final Windows suite 193 passed /
 3 skipped (two platform checks plus native PostgreSQL opt-in). Ruff, compileall including
 migrations, repository security policy, dependency consistency and diff checks passed.
 Existing operational model checksum is unchanged. No Databricks query/write, migration
-against a real database, PostgreSQL service change or real prediction persistence was executed.
+against a real database, PostgreSQL service change or real prediction persistence was executed
+in PR #15.
+
+## Native PostgreSQL validation — 2026-10-27
+
+| Check | Result |
+| --- | --- |
+| PostgreSQL | 16.13 |
+| Loopback-only | PASS |
+| Migration | PASS |
+| Runtime least privilege | PASS |
+| Native integration | PASS |
+| Real batch | PASS |
+| Real idempotency | PASS |
+| History API | PASS |
+| Rollback | PASS |
+| Concurrency | PASS |
+| Timeout | PASS |
 
 ## Deployment boundary
 
