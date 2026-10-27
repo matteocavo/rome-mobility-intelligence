@@ -1,0 +1,133 @@
+{
+  "name": "Rome Mobility - Authenticated Integration Boundary",
+  "active": false,
+  "nodes": [
+    {
+      "id": "authenticated-webhook",
+      "name": "Authenticated Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rmi-orchestration",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "minimal-event-only",
+      "name": "Minimal Event Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "minimal-event",
+              "leftValue": "={{ $json.body !== null && typeof $json.body === 'object' && !Array.isArray($json.body) && Object.keys($json.body).sort().join(',') === 'event,generated_at,request_id' && $json.body.event === 'prediction_orchestration_requested' && typeof $json.body.request_id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test($json.body.request_id) && typeof $json.body.generated_at === 'string' && Number.isFinite(Date.parse($json.body.generated_at)) && /(?:Z|[+-]00:00)$/.test($json.body.generated_at) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "acknowledge-only",
+      "name": "Acknowledge Only",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\":true}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "reject-invalid-event",
+      "name": "Reject Invalid Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\":false}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Authenticated Webhook": {
+      "main": [
+        [
+          {
+            "node": "Minimal Event Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Minimal Event Only": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Only",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Invalid Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome",
+    "executionTimeout": 600,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {},
+  "tags": []
+}

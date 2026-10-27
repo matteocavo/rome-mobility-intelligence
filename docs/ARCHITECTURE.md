@@ -6,7 +6,7 @@
 | --- | --- |
 | Databricks / repository core | Ingestion, Bronze/Silver/enrichment, feature causali, etichette, Gold, serving datasets, qualità e dashboard |
 | Questo repository | Configurazione, accesso SELECT, training/evaluation sklearn, persistenza, caricamento, inference interna e API FastAPI |
-| n8n, futuro | Orchestrazione cross-system; nessun duplicato dei Job interni Databricks |
+| n8n Cloud | Template HTTP inattivi e boundary webhook autenticato; nessun duplicato dei Job Databricks |
 | React + Google AI Studio, futuro | App e progettazione UX/UI che consumano API validate |
 
 Spark ML rimane ricerca/riferimento storico. Non si converte la Random Forest Spark;
@@ -51,7 +51,8 @@ Fonti upstream fissate:
 - [Roadmap](https://github.com/matteocavo/rome-public-transport-reliability/blob/7d263629b533f57af46ffaadcb56e4fcc0f296a7/docs/ROADMAP.md)
 
 Stati storici nelle sezioni Spark non diventano impostazioni operative sklearn. Nessuna
-autenticazione, scheduler, frontend, n8n o deploy cloud in questa fase. La prediction history
+autenticazione, scheduler attivo, frontend o deploy cloud in questa fase. I template n8n Cloud
+restano inattivi. La prediction history
 PostgreSQL è ora un componente opzionale, disabilitato di default.
 
 ## Stato dopo il primo training reale
@@ -92,4 +93,17 @@ per preview e BatchScoringService. Solo il trigger manuale abilitato esplicitame
 PostgreSQL tramite PredictionHistoryRepository. Database gestisce engine/pool/sessioni,
 models definisce lo schema e Alembic applica le migrazioni fuori dal runtime HTTP.
 La history API legge soltanto PostgreSQL, con filtri e range bounded. Nessun SQL business nelle
-route, salvataggio implicito, scheduler, frontend o n8n. [Disegno e limiti](PREDICTION_HISTORY.md).
+route, salvataggio implicito, scheduler attivo o frontend. n8n è soltanto un client opzionale
+di questi endpoint. [Disegno e limiti](PREDICTION_HISTORY.md).
+
+## Orchestratore n8n Cloud
+
+Lo schedule n8n chiama readiness → persistence → history → summary, con due retry bounded.
+FastAPI resta responsabile di contract, modello, SQL, transazioni e idempotenza.
+Il client server-side N8nClient può notificare esclusivamente il webhook HTTPS configurato,
+con host Cloud allowlisted e Header Auth. Il workflow webhook distinto valida l'evento e
+risponde soltanto con ACK: non richiama FastAPI né esegue persistence. Non esiste un endpoint
+pubblico di trigger e nessun endpoint esistente viene modificato per chiamare n8n.
+Questo evita loop tra trigger e operazione. Nessuna Admin API o credenziale DB/Databricks
+in n8n. Google AI Studio/frontend futuro passa sempre da FastAPI autenticata/rate-limited.
+[Configurazione/import e smoke Cloud pending](N8N_CLOUD_ORCHESTRATION.md).

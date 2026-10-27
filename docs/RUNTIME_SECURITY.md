@@ -1,5 +1,17 @@
 # Runtime security: artifact trust e query budgets
 
+## Boundary n8n Cloud
+
+Nessuna API key amministrativa n8n entra nell'applicazione. N8nClient non accetta URL/payload
+HTTP arbitrari: usa URL SecretStr e secret server-side, HTTPS con host Cloud esatto configurato,
+path webhook allowlisted, nessun redirect/proxy e risposta bounded. Timeout/errori sono
+sanitizzati. Nessuna notifica automatica o nuova route pubblica è introdotta.
+Header Auth nativo va configurato manualmente sul Webhook Cloud prima di utilizzarlo;
+l'export omette riferimenti/valori credential. Il workflow ACK non richiama FastAPI.
+Lo schedule separato è inattivo e chiama solo endpoint FastAPI configurati, con retry bounded.
+Dati di esecuzione disabilitati, summary senza righe complete, nessuna credential DB/Databricks.
+Nessun Docker, listener, tunnel o deploy pubblico. [Confini e setup](N8N_CLOUD_ORCHESTRATION.md).
+
 L'API inference stateless estende questi stessi controlli, senza loader o connector paralleli.
 Schema HTTP chiuso per le 47 feature, nessun override di path/threshold/SQL e max batch 100.
 Query current fissa sul dataset scoring; log sanitizzati, errori senza input riflessi.

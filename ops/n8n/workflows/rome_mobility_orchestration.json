@@ -1,0 +1,1595 @@
+{
+  "name": "Rome Mobility - Prediction Orchestration",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "schedule-every-15-minutes",
+      "name": "Schedule Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fastapi-configuration",
+      "name": "FastAPI Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -260,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "api-url",
+              "name": "RMI_API_BASE_URL",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "local-api-only",
+      "name": "Configured Secure API",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "local-api-only",
+              "leftValue": "={{ /^https:\\/\\/(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(?::443)?$/.test($json.RMI_API_BASE_URL || '') && !/\\.(?:invalid|localhost|local|internal)(?::443)?$/i.test($json.RMI_API_BASE_URL) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/health\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "configuration-rejected",
+      "name": "Configuration Rejected",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "configuration_rejected",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "health-ok",
+      "name": "Health OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.status === 'ok' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ready",
+      "name": "Ready",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/ready\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "health-unavailable",
+      "name": "Health Unavailable",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        220
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "health_unavailable",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "ready-for-persistence",
+      "name": "Ready For Persistence",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-for-persistence",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body?.model_ready === true && $json.body?.artifact_integrity === 'verified' && $json.body?.workload_identity_configured === true && $json.body?.database_configured === true && $json.body?.prediction_persistence_enabled === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "not-ready",
+      "name": "Not Ready",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        220
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "not_ready",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "persist-attempt-1",
+      "name": "Persist Attempt 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        780,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/predictions/current/persist?limit=100\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 140000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "outcome-attempt-1",
+      "name": "Outcome Attempt 1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        220
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "persist-1-ok",
+      "name": "Persist 1 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "persist-1-ok",
+              "leftValue": "={{ $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "retryable-attempt-1",
+      "name": "Retryable Attempt 1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "retryable-attempt-1",
+              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-30-seconds",
+      "name": "Wait 30 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        440
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "persist-attempt-2",
+      "name": "Persist Attempt 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        260,
+        440
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/predictions/current/persist?limit=100\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 140000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "outcome-attempt-2",
+      "name": "Outcome Attempt 2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        440
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "persist-2-ok",
+      "name": "Persist 2 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "persist-2-ok",
+              "leftValue": "={{ $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "retryable-attempt-2",
+      "name": "Retryable Attempt 2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "retryable-attempt-2",
+              "leftValue": "={{ $json.statusCode === 503 || $json.statusCode === 504 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-60-seconds",
+      "name": "Wait 60 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        440
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 60,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "persist-attempt-3",
+      "name": "Persist Attempt 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1560,
+        440
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/predictions/current/persist?limit=100\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 140000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "outcome-attempt-3",
+      "name": "Outcome Attempt 3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        660
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "persist-3-ok",
+      "name": "Persist 3 OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "persist-3-ok",
+              "leftValue": "={{ $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "persistence-failed",
+      "name": "Persistence Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        660
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ null }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "persistence_failed",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "persistence-summary",
+      "name": "Persistence Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        780,
+        660
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ $json.body.source_watermark }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ $json.body.rows_evaluated }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ $json.body.rows_inserted }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ $json.body.rows_existing }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ $json.body.model_version }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ $json.body.threshold }}",
+              "type": "number"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "history-followup",
+      "name": "History Followup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        660
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('FastAPI Configuration').first().json.RMI_API_BASE_URL + \"/predictions/history?limit=10\" }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "history-ok",
+      "name": "History OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "history-ok",
+              "leftValue": "={{ $json.statusCode === 200 && typeof $json.body?.rows === \"number\" && $json.body.rows >= 0 && $json.body.rows <= 10 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "success",
+      "name": "Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        660
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ $('Persistence Summary').first().json.source_watermark }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ $('Persistence Summary').first().json.rows_evaluated }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ $('Persistence Summary').first().json.rows_inserted }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ $('Persistence Summary').first().json.rows_existing }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ $('Persistence Summary').first().json.model_version }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ $('Persistence Summary').first().json.threshold }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ $json.body.rows }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "={{ $('Persistence Summary').first().json.rows_inserted === 0 && $('Persistence Summary').first().json.rows_existing === $('Persistence Summary').first().json.rows_evaluated ? 'success_idempotent' : 'success' }}",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $('Persistence Summary').first().json.retry_count }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "history-followup-failed",
+      "name": "History Followup Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        880
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution_timestamp",
+              "name": "execution_timestamp",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "source_watermark",
+              "name": "source_watermark",
+              "value": "={{ $('Persistence Summary').first().json.source_watermark }}",
+              "type": "string"
+            },
+            {
+              "id": "rows_evaluated",
+              "name": "rows_evaluated",
+              "value": "={{ $('Persistence Summary').first().json.rows_evaluated }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_inserted",
+              "name": "rows_inserted",
+              "value": "={{ $('Persistence Summary').first().json.rows_inserted }}",
+              "type": "number"
+            },
+            {
+              "id": "rows_existing",
+              "name": "rows_existing",
+              "value": "={{ $('Persistence Summary').first().json.rows_existing }}",
+              "type": "number"
+            },
+            {
+              "id": "model_version",
+              "name": "model_version",
+              "value": "={{ $('Persistence Summary').first().json.model_version }}",
+              "type": "string"
+            },
+            {
+              "id": "threshold",
+              "name": "threshold",
+              "value": "={{ $('Persistence Summary').first().json.threshold }}",
+              "type": "number"
+            },
+            {
+              "id": "history_rows_returned",
+              "name": "history_rows_returned",
+              "value": "={{ null }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "history_followup_failed",
+              "type": "string"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $('Persistence Summary').first().json.retry_count }}",
+              "type": "number"
+            },
+            {
+              "id": "http_status",
+              "name": "http_status",
+              "value": "={{ $json.statusCode ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "persistence_succeeded",
+              "name": "persistence_succeeded",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "FastAPI Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "FastAPI Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health": {
+      "main": [
+        [
+          {
+            "node": "Health OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health OK": {
+      "main": [
+        [
+          {
+            "node": "Ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready": {
+      "main": [
+        [
+          {
+            "node": "Ready For Persistence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready For Persistence": {
+      "main": [
+        [
+          {
+            "node": "Persist Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Outcome Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Persist 1 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist 1 OK": {
+      "main": [
+        [
+          {
+            "node": "Persistence Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retryable Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retryable Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Persistence Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Persist Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Outcome Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Persist 2 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist 2 OK": {
+      "main": [
+        [
+          {
+            "node": "Persistence Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retryable Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retryable Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Wait 60 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Persistence Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 60 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Persist Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Outcome Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Persist 3 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist 3 OK": {
+      "main": [
+        [
+          {
+            "node": "Persistence Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Persistence Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persistence Summary": {
+      "main": [
+        [
+          {
+            "node": "History Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "History Followup": {
+      "main": [
+        [
+          {
+            "node": "History OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "History OK": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "History Followup Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FastAPI Configuration": {
+      "main": [
+        [
+          {
+            "node": "Configured Secure API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configured Secure API": {
+      "main": [
+        [
+          {
+            "node": "Health",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Configuration Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome",
+    "executionTimeout": 600,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {},
+  "tags": []
+}
