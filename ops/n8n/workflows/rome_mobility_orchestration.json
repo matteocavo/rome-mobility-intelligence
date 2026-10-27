@@ -117,10 +117,13 @@
             }
           },
           "timeout": 10000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "configuration-rejected",
@@ -272,10 +275,13 @@
             }
           },
           "timeout": 10000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "health-unavailable",
@@ -517,10 +523,13 @@
             }
           },
           "timeout": 140000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "outcome-attempt-1",
@@ -655,10 +664,13 @@
             }
           },
           "timeout": 140000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "outcome-attempt-2",
@@ -793,10 +805,13 @@
             }
           },
           "timeout": 140000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "outcome-attempt-3",
@@ -1032,10 +1047,13 @@
             }
           },
           "timeout": 10000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "onError": "continueRegularOutput",
-      "retryOnFail": false
+      "retryOnFail": false,
+      "notes": "Configure Header Auth with header name X-RMI-Service-Key before use."
     },
     {
       "id": "history-ok",

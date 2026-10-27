@@ -1,5 +1,15 @@
 # Architettura
 
+## Preparazione deployment
+
+Tutti gli endpoint dati/inference sono ora service-to-service con X-RMI-Service-Key;
+il frontend futuro richiede un'autenticazione utenti separata e non riceve questa chiave.
+HttpSecurity applica auth prima del body, budget globali bounded per classe, limiti byte,
+Host allowlist, header e log minimizzati. CORS è vuoto di default; forwarded headers non
+sono trusted. /health è liveness e /ready anonima è ridotta; i dettagli sono protetti.
+Container non-root provider-neutral, modello su mount read-only con digest esterno, un solo
+worker. Nessun provider o deployment effettivo. [Audit e requisiti](SECURE_DEPLOYMENT.md).
+
 ## Confini
 
 | Sistema | Responsabilità |
