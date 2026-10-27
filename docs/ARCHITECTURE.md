@@ -74,3 +74,12 @@ Il serving usa soltanto artifact approvati con digest esterno, root fidata e byt
 prima della deserializzazione. Query ammesse entro deadline, cap righe e concorrenza per processo.
 [Disegno e prove](RUNTIME_SECURITY.md). La protezione non sostituisce isolamento OS, auth API
 o rate limiting di un futuro deployment pubblico.
+
+## Inference stateless locale
+
+Le route /predict e /predict/batch validano le 47 feature con schema Pydantic chiuso e usano
+il ModelService trusted già caricato; il lock serializza predict_proba e la threshold proviene
+dai metadata. /predictions/current usa CurrentScoringRepository con tabella fissa, ultimo
+feed_timestamp, lineage verificata e ordinamento deterministico. Identificativi operativi
+restano separati dall'input modello e il ritardo osservato è distinto dalla prediction next stop.
+Nessuna history o scrittura; [contratto API e confini](INFERENCE_API.md).

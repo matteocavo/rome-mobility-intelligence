@@ -1,9 +1,9 @@
 # Rome Mobility Intelligence
 
-Foundation **FastAPI + scikit-learn** per il futuro ML operativo del trasporto pubblico di Roma.
-Stato: **primo artifact sklearn reale addestrato e validato localmente**, pronto per review.
+API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
+Stato: **inference stateless sul modello reale e latest current scoring snapshot**, per review.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
-**Nessuna inference live o deployment**. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
+Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 Il [repository Data/ML](https://github.com/matteocavo/rome-public-transport-reliability)
 rimane la sorgente di ingestion GTFS/GTFS-RT, Bronze/Silver, enrichment, feature engineering,
@@ -16,7 +16,7 @@ contiene il runtime applicativo target sklearn/FastAPI, senza notebook o trasfor
 Databricks -> dataset etichettato v12 / input scoring versionato
            -> export SELECT limitato e riproducibile
            -> sklearn: preprocessing + modello + soglia rivalidata
-           -> bundle locale immutabile -> FastAPI /health /ready /model/info
+           -> bundle trusted immutabile -> FastAPI inference e metadata
 ```
 
 47 feature grezze: 42 numeriche e 5 categoriche (`route_id`, `route_type`, `direction_id`,
@@ -86,13 +86,19 @@ fuori Git. [Valutazione reale](docs/REAL_MODEL_EVALUATION.md). Vedere
 | Endpoint | Comportamento |
 | --- | --- |
 | `GET /health` | Stato processo, servizio e versione |
-| `GET /ready` | App inizializzata; se artifact configurato deve essere caricabile, altrimenti 503 |
+| `GET /ready` | Modello trusted caricato, integrity e configurazione identità; 503 senza modello |
 | `GET /model/info` | Tipo modello, timestamp, hash/versione contratto, soglia, metriche validation/TEST e flag synthetic; 503 senza modello |
+| `POST /predict` | Una osservazione con esattamente le 47 feature |
+| `POST /predict/batch` | Lista di osservazioni; max 100, configurabile verso il basso |
+| `GET /predictions/current?limit=50` | Latest available current scoring snapshot, inference read-only e freshness |
 
-La readiness skeleton non certifica un modello disponibile né la connessione Databricks.
-Il modello si carica all'avvio e non viene ricaricato per ogni richiesta. Non esiste `/predict`
-pubblico; `ModelService` espone inference interna guidata dal contratto e dalla soglia salvata.
-Autenticazione e hosting di produzione sono fasi successive.
+Il modello si carica una volta all'avvio tramite il loader trusted. La soglia viene dai metadata
+(0.35 per il modello reale corrente), mai dalla richiesta. Le fixture sintetiche sono rifiutate
+dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query SQL.
+[Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
+Non esistono prediction history, frontend o n8n. Autenticazione API e hosting sono fasi successive.
+Public deployment is NOT yet approved: serve un account OS di servizio separato, senza ownership
+dello storage modello e senza accesso al credential store personale dell'operatore.
 
 ## Verifiche
 

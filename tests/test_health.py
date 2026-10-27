@@ -11,7 +11,8 @@ def test_health_and_skeleton_readiness():
         assert response.json()["version"] == "0.1.0"
         assert client.get("/ready").json()["mode"] == "skeleton"
         assert client.get("/model/info").status_code == 503
-        assert client.post("/predict").status_code == 404
+        assert client.post("/predict").status_code == 503
+        assert client.get("/ready").status_code == 503
 
 
 def test_configured_missing_artifact_not_ready(tmp_path):
@@ -65,6 +66,8 @@ def test_model_info_reference_excludes_private_queries(bundle, bundle_trust):
             "query": "private-sql",
             "parameters": {"start": 1},
             "strata_allocation": [{"n": 10}],
+            "artifact_path": "private-local-path",
+            "secret_reference": "private-credential-store",
         }
     }
     reference = service.info()["training_data_reference"]

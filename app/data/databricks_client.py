@@ -22,6 +22,10 @@ class ExportBudgetError(DataAccessError):
     pass
 
 
+class QueryTimeoutError(DataAccessError):
+    """Application deadline expired and cancellation was requested."""
+
+
 def guard_select(query: str) -> None:
     try:
         statements = sqlglot.parse(query, read="databricks")
@@ -112,7 +116,9 @@ class DatabricksClient:
                 cfg.databricks_query_timeout_seconds,
                 operation,
             )
-        except (QueryCapacityExceeded, QueryDeadlineExceeded) as error:
+        except QueryDeadlineExceeded as error:
+            raise QueryTimeoutError(str(error)) from None
+        except QueryCapacityExceeded as error:
             raise DataAccessError(str(error)) from None
 
     def _select_connected(

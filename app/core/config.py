@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     databricks_query_timeout_seconds: float = Field(default=120, ge=0.05, le=600)
     databricks_queue_timeout_seconds: float = Field(default=1, ge=0, le=10)
     databricks_max_concurrent_queries: int = Field(default=1, ge=1, le=4)
+    inference_max_batch_rows: int = Field(default=100, ge=1, le=100)
+    inference_max_bytes: int = Field(default=8_000_000, ge=1024, le=64_000_000)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod
