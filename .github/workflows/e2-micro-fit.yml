@@ -1,0 +1,26 @@
+name: E2 Micro fit diagnostic
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/e2_micro_fit.py
+      - .github/workflows/e2-micro-fit.yml
+permissions:
+  contents: read
+jobs:
+  fit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Real constrained containers, synthetic state only
+        run: python3 -m scripts.e2_micro_fit
+      - name: Evidence summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/e2-fit-report.json"; then
+            cat "$RUNNER_TEMP/e2-fit-report.json" >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/e2-fit-report.json"
+          fi
