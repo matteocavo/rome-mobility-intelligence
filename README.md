@@ -1,7 +1,16 @@
 # Rome Mobility Intelligence
 
-**SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED**.
-[OCI deployment and backup runbooks](ops/n8n/oci/README.md). **ONLY ONE scheduler active at a time**; Actions remains fallback only.
+**Deployment preparato; provisioning non ancora eseguito.**
+A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
+Il test con container reali su GitHub Actions classifica E2 Micro come **MARGINAL**:
+le verifiche funzionali passano senza OOM o swap, ma avvio e riavvio sotto CPU limitata
+richiedono circa 213 e 194 secondi. Questo risultato non autorizza il provisioning.
+[Test E2 Micro e limiti della simulazione](ops/n8n/oci/E2_FIT.md) ·
+[Runbook di deployment e backup OCI](ops/n8n/oci/README.md).
+**Un solo scheduler attivo alla volta**; GitHub Actions resta il fallback, solo con opt-in.
+
+**Progetto collegato:** [Rome Public Transport Reliability & Delay Prediction](https://github.com/matteocavo/rome-public-transport-reliability),
+il repository Data/ML che alimenta questo runtime applicativo.
 
 API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
 Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**, per review.
@@ -9,13 +18,14 @@ HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valuta
 Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 **P0: infrastruttura ricorrente a 0 EUR.**
-**PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. Il progetto mantiene un layer
+**Orchestrator low-code principale previsto: n8n Community Edition su OCI Always Free**. Il progetto mantiene un layer
 low-code/no-code reale e significativo, principale se tecnicamente sostenibile a costo zero.
 **GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti e solo con opt-in.
-n8n: primary low-code integration; selected and prepared, not yet provisioned.
+n8n: integrazione low-code scelta e preparata, non ancora installata su OCI.
 Una subscription n8n Cloud a pagamento non può essere un requisito obbligatorio.
-Delivery modello privata in build, gate Linux/RAM e opt-in schedule ancora da verificare
-prima di un deployment reale. [Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
+La delivery privata del modello e i gate del deployment reale restano da completare;
+il test E2 Micro non verifica l'overhead OS/Docker della VM né il burst OCI.
+[Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
 
 Il [repository Data/ML](https://github.com/matteocavo/rome-public-transport-reliability)
 rimane la sorgente di ingestion GTFS/GTFS-RT, Bronze/Silver, enrichment, feature engineering,
@@ -110,7 +120,7 @@ dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query 
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
 Prediction history PostgreSQL è opzionale e disabilitata di default; nessun frontend.
 Autenticazione API e hosting sono fasi successive.
-Public deployment is NOT yet approved: serve un account OS di servizio separato, senza ownership
+Il deployment pubblico non è ancora approvato: serve un account OS di servizio separato, senza ownership
 dello storage modello e senza accesso al credential store personale dell'operatore.
 
 ## Prediction history PostgreSQL
@@ -128,7 +138,8 @@ Schema gestito da `alembic upgrade head`, mai creato automaticamente all'avvio.
 Primary: n8n Community su OCI Always Free, con workflow importabili e inattivi in [ops/n8n](ops/n8n/README.md).
 Schedule ogni 30 minuti, cold-start wait/retry finiti e summary compatti; webhook separato con Header Auth.
 Il client server-side FastAPI usa soltanto URL HTTPS configurata, host esplicitamente fidato,
-secret privato e payload minimo. Nessuna n8n Admin API/key; Compose OCI preparato ma nessun container reale avviato.
+secret privato e payload minimo. Nessuna n8n Admin API/key; Compose OCI preparato,
+test con container reali eseguito su GitHub Actions, nessuna VM OCI ancora provisionata.
 [Import, autenticazione e confini](docs/N8N_CLOUD_ORCHESTRATION.md).
 Lo smoke end-to-end resta pending: n8n Cloud non può raggiungere in sicurezza il FastAPI locale.
 Nessun deploy pubblico o tunnel è approvato o creato.
