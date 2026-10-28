@@ -29,7 +29,9 @@ Evidence includes sampled cgroup usage, peak, swap, RSS of PID 1, CPU throttling
 Docker stats, limits, exit/OOM/restart state, operation times and persistence/key
 checks. RSS is sampled for PID 1 and summed across cgroup processes (shared pages
 can be counted twice); cgroup accounting remains authoritative. Editor and public
-settings API response times are checked through the loopback proxy.
+settings API response times are checked through the internal bridge address of
+Caddy; Docker internal networks do not provide external port routing. Any published
+diagnostic listener is restricted to loopback.
 Sum of independent service peaks is an upper bound, not a simultaneous peak.
 Short-lived peaks rely on cgroup memory.peak. Five minutes of idle observation
 cannot establish long-term leak freedom or production reliability.

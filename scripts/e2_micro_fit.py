@@ -79,12 +79,14 @@ def ready():
         if not inspect(f"{PREFIX}-n8n")["State"]["Running"]:
             raise RuntimeError("n8n exited before readiness; inspect container diagnostic")
         try:
-            with urllib.request.urlopen("http://127.0.0.1:18080/healthz/readiness", timeout=5) as r:
+            address = inspect(f"{PREFIX}-caddy")["NetworkSettings"]["Networks"][PREFIX]["IPAddress"]
+            base_url = f"http://{address}:8080"
+            with urllib.request.urlopen(base_url + "/healthz/readiness", timeout=5) as r:
                 if r.status == 200:
                     for endpoint in ("/", "/rest/settings"):
                         started = time.monotonic()
                         with urllib.request.urlopen(
-                            "http://127.0.0.1:18080" + endpoint, timeout=15
+                            base_url + endpoint, timeout=15
                         ) as response:
                             assert response.status == 200
                             response.read()
@@ -264,6 +266,19 @@ def main():
                             synthetic_key, "[synthetic-key-redacted]"
                         ),
                     }
+                    if role == "n8n" and item["State"]["Running"]:
+                        probe = run(
+                            "docker", "exec", name, "node", "-e",
+                            "const fs=require('fs');"
+                            "for(const p of ['/tmp','/home/node/.cache','/home/node/.n8n'])"
+                            "{const s=fs.statfsSync(p);console.log(JSON.stringify({"
+                            "path:p,free:s.bavail*s.bsize,total:s.blocks*s.bsize}));}"
+                            "require('http').get('http://127.0.0.1:5678/healthz/readiness',"
+                            "r=>{console.log('direct_readiness='+r.statusCode);r.resume();})"
+                            ".on('error',e=>console.log(e.code));",
+                            check=False, timeout=30,
+                        )
+                        REPORT["final_containers"][role]["filesystem_probe"] = probe.stdout
                 run("docker", "rm", "-f", f"{PREFIX}-{role}", check=False)
             run("sudo", "rm", "-rf", str(data))  # Only isolated TemporaryDirectory state.
             run("sudo", "chown", str(os.getuid()), str(key))
