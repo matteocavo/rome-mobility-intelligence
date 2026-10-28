@@ -223,7 +223,19 @@ def main():
         finally:
             STOP.set()
             monitor.join(timeout=15)
+            REPORT["final_containers"] = {}
             for role in ("n8n", "caddy"):
+                name = f"{PREFIX}-{role}"
+                info = run("docker", "inspect", name, check=False)
+                if info.returncode == 0:
+                    item = json.loads(info.stdout)[0]
+                    logs = run("docker", "logs", "--tail", "40", name, check=False)
+                    REPORT["final_containers"][role] = {
+                        "state": item["State"], "restarts": item["RestartCount"],
+                        "diagnostic": (logs.stdout + logs.stderr)[-5000:].replace(
+                            key.read_text(), "[synthetic-key-redacted]"
+                        ),
+                    }
                 run("docker", "rm", "-f", f"{PREFIX}-{role}", check=False)
             run("sudo", "rm", "-rf", str(data))  # Only isolated TemporaryDirectory state.
             run("sudo", "chown", str(os.getuid()), str(key))
