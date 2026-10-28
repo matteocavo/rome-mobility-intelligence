@@ -154,7 +154,8 @@ def main():
             run("docker", "run", "-d", "--name", f"{PREFIX}-caddy",
                 "--platform", "linux/amd64", "--network", PREFIX,
                 "--memory", "64m", "--memory-swap", "64m", "--cpus", "0.025",
-                "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                "--read-only", "--cap-drop", "ALL", "--cap-add", "NET_BIND_SERVICE",
+                "--security-opt", "no-new-privileges",
                 "--tmpfs", "/data:size=8m", "--tmpfs", "/config:size=8m",
                 "-p", "127.0.0.1:18080:8080",
                 "-v", f"{tmp / 'Caddyfile'}:/etc/caddy/Caddyfile:ro", images[1])
