@@ -47,6 +47,17 @@ def sample():
                     for line in Path(f"/proc/{pid}/status").read_text().splitlines()
                     if line.startswith("VmRSS:")
                 )
+                process_rss = []
+                for process in (base / "cgroup.procs").read_text().split():
+                    try:
+                        process_rss.append(next(
+                            int(line.split()[1])
+                            for line in Path(f"/proc/{process}/status").read_text().splitlines()
+                            if line.startswith("VmRSS:")
+                        ))
+                    except (OSError, StopIteration):
+                        continue
+                row["process_tree_rss_kib"] = sum(process_rss)
                 REPORT["samples"].append(row)
             except (OSError, ValueError, subprocess.SubprocessError, StopIteration):
                 pass
@@ -70,6 +81,17 @@ def ready():
         try:
             with urllib.request.urlopen("http://127.0.0.1:18080/healthz/readiness", timeout=5) as r:
                 if r.status == 200:
+                    for endpoint in ("/", "/rest/settings"):
+                        started = time.monotonic()
+                        with urllib.request.urlopen(
+                            "http://127.0.0.1:18080" + endpoint, timeout=15
+                        ) as response:
+                            assert response.status == 200
+                            response.read()
+                        REPORT.setdefault("response_seconds", []).append({
+                            "endpoint": endpoint,
+                            "seconds": round(time.monotonic() - started, 3),
+                        })
                     return
         except OSError:
             pass

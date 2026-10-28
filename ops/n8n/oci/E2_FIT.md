@@ -27,7 +27,9 @@ server stopped, retaining its memory ceiling and avoiding concurrent SQLite acce
 
 Evidence includes sampled cgroup usage, peak, swap, RSS of PID 1, CPU throttling,
 Docker stats, limits, exit/OOM/restart state, operation times and persistence/key
-checks. PID 1 RSS does not replace cgroup accounting for the full process tree.
+checks. RSS is sampled for PID 1 and summed across cgroup processes (shared pages
+can be counted twice); cgroup accounting remains authoritative. Editor and public
+settings API response times are checked through the loopback proxy.
 Sum of independent service peaks is an upper bound, not a simultaneous peak.
 Short-lived peaks rely on cgroup memory.peak. Five minutes of idle observation
 cannot establish long-term leak freedom or production reliability.
@@ -40,5 +42,6 @@ OOM and failed startup/import/export require inspection of collected evidence
 before assigning NOT SUITABLE. Review evidence before any OCI provisioning.
 
 Only the measurement JSON is printed to the job summary. Database, encryption
-key, workflow exports and container logs are never uploaded. Ephemeral state is
+key and workflow exports are never uploaded. Tail diagnostics on failure are
+limited to this synthetic environment and redact its random key. Ephemeral state is
 removed after the test. No repository artifact or production service is changed.
