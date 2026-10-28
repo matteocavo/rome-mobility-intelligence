@@ -99,7 +99,8 @@ def main():
         data = tmp / "state"
         data.mkdir(mode=0o700)
         key = tmp / "encryption"
-        key.write_text(secrets.token_hex(32))
+        synthetic_key = secrets.token_hex(32)
+        key.write_text(synthetic_key)
         os.chmod(key, 0o400)
         run("sudo", "chown", "1000:1000", str(data), str(key))
         source = ROOT / "ops/n8n/workflows/rome_mobility_orchestration.json"
@@ -237,7 +238,7 @@ def main():
                     REPORT["final_containers"][role] = {
                         "state": item["State"], "restarts": item["RestartCount"],
                         "diagnostic": (logs.stdout + logs.stderr)[-5000:].replace(
-                            key.read_text(), "[synthetic-key-redacted]"
+                            synthetic_key, "[synthetic-key-redacted]"
                         ),
                     }
                 run("docker", "rm", "-f", f"{PREFIX}-{role}", check=False)
