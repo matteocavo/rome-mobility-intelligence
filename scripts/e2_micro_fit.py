@@ -63,6 +63,10 @@ def timed(label, action):
 def ready():
     deadline = time.monotonic() + 360
     while time.monotonic() < deadline:
+        if not inspect(f"{PREFIX}-caddy")["State"]["Running"]:
+            raise RuntimeError("Caddy exited before readiness; inspect container diagnostic")
+        if not inspect(f"{PREFIX}-n8n")["State"]["Running"]:
+            raise RuntimeError("n8n exited before readiness; inspect container diagnostic")
         try:
             with urllib.request.urlopen("http://127.0.0.1:18080/healthz/readiness", timeout=5) as r:
                 if r.status == 200:
