@@ -151,9 +151,21 @@ def test_low_code_architecture_is_community_oci_and_actions_is_fallback():
     ]
     for name in documents:
         text = Path(name).read_text(encoding="utf-8")
-        assert "n8n Community Edition on OCI Always Free" in text, name
-        assert "SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED" in text, name
-        assert "ONLY ONE scheduler active at a time" in text, name
+        required = (
+            (
+                "n8n Community Edition su OCI Always Free",
+                "Deployment preparato; provisioning non ancora eseguito.",
+                "Un solo scheduler attivo alla volta",
+            )
+            if name == "README.md"
+            else (
+                "n8n Community Edition on OCI Always Free",
+                "SELECTED / DEPLOYMENT PREPARED / NOT YET PROVISIONED",
+                "ONLY ONE scheduler active at a time",
+            )
+        )
+        for statement in required:
+            assert statement in text, name
         assert "GitHub Actions: zero-cost fallback scheduler" in text, name
         assert "0 EUR" in text, name
         normalized = " ".join(text.lower().split())
