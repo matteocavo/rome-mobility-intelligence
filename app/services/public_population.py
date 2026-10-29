@@ -1,6 +1,7 @@
 """Bounded whole-current-population inference/cache, with page operations after global filters."""
 
 import hashlib
+import logging
 import time
 from collections import namedtuple
 from datetime import datetime, timezone
@@ -17,6 +18,7 @@ from app.services.public_summary import NetworkSummary, RouteRisk
 # Immutable tuple storage has no per-row dict/fields-set. Pydantic validation still
 # covers every source row; only the selected <=50 rows become response models.
 PublicRow = namedtuple("PublicRow", PublicPrediction.model_fields)
+logger = logging.getLogger(__name__)
 
 
 class PublicPopulation:
@@ -42,7 +44,14 @@ class PublicPopulation:
                 raise DataAccessError("Operational model unavailable")
             self._rows, self._summary, self._snapshot = [], None, None
             started = time.monotonic()
+            source_started = time.perf_counter()
             frame = self.repository.population()
+            logger.info(
+                "public_population_source rows=%d dataframe_bytes=%d duration_ms=%d",
+                len(frame),
+                int(frame.memory_usage(deep=True).sum()) if not frame.empty else 0,
+                round((time.perf_counter() - source_started) * 1000),
+            )
             if frame.empty:
                 now = datetime.now(timezone.utc)
                 self._summary = NetworkSummary(
@@ -67,6 +76,7 @@ class PublicPopulation:
                 return self._snapshot
             # Inference uses only the reviewed, fixed current-source feature contract.
             values = np.empty(len(frame), dtype=np.float64)
+            inference_started = time.perf_counter()
             for start in range(0, len(frame), 1024):
                 end = min(start + 1024, len(frame))
                 values[start:end] = model.predict_proba(
@@ -74,6 +84,10 @@ class PublicPopulation:
                 )
             if len(values) != len(frame) or not np.isfinite(values).all():
                 raise ValueError("Invalid current population probabilities")
+            logger.info(
+                "public_population_inference rows=%d duration_ms=%d",
+                len(values), round((time.perf_counter() - inference_started) * 1000),
+            )
             # Inference/contract audit are complete; do not retain 47 features and
             # repeated lineage columns while building the public population.
             context = [
@@ -91,6 +105,7 @@ class PublicPopulation:
             frame = frame.loc[:, [name for name in context if name in frame.columns]]
             now = datetime.now(timezone.utc)
             watermark = datetime.fromtimestamp(int(frame.feed_timestamp.iloc[0]), timezone.utc)
+            cache_started = time.perf_counter()
             result = []
             columns = list(frame.columns)
             for index, values_row in enumerate(frame.itertuples(index=False, name=None)):
@@ -206,6 +221,13 @@ class PublicPopulation:
             self._rows, self._summary = result, summary
             self._expires = time.monotonic() + 300
             self._snapshot = (self._rows, self._summary, self._expires)
+            logger.info(
+                "public_population_cache rows=%d routes=%d duration_ms=%d total_ms=%d",
+                total,
+                summary.route_count,
+                round((time.perf_counter() - cache_started) * 1000),
+                round((time.monotonic() - started) * 1000),
+            )
             return self._snapshot
         except Exception:
             self._failed_until = time.monotonic() + 30

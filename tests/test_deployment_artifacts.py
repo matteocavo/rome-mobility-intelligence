@@ -31,6 +31,12 @@ def test_runtime_pins_match_reviewed_pins_without_ml_upgrades():
         "psycopg",
         "databricks-sql-connector",
     } <= set(runtime)
+    assert "pyarrow" in runtime
+    assert "[pyarrow]" in Path("requirements-runtime.txt").read_text(encoding="utf-8")
+    assert "[pyarrow]" in Path("requirements-dev.txt").read_text(encoding="utf-8")
+    assert "databricks-sql-connector[pyarrow]>=4,<5" in Path(
+        "pyproject.toml"
+    ).read_text(encoding="utf-8")
 
 
 def test_container_only_packages_code_with_immutable_nonroot_runtime():
