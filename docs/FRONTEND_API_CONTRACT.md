@@ -15,6 +15,8 @@ Never place RMI_SERVICE_API_KEY or any backend secret in browser code.
 | `/public/summary` | GET anonimo | aggregati della popolazione scoring corrente completa |
 | `/public/predictions/current` | GET anonimo | pagina ordinata/filtrata della stessa popolazione corrente |
 | `/public/predictions/history` | GET anonimo | pagina ordinata/filtrata di tutte le predizioni persistite Neon |
+| `/public/predictions/current/aggregate` | GET anonimo | KPI e istogramma delle probabilità sull’intera popolazione corrente filtrata |
+| `/public/predictions/history/aggregate` | GET anonimo | totale e bucket orari sull’intero storico filtrato |
 
 Current non legge Neon come surrogato del dataset corrente. History non definisce
 il denominatore corrente. Nessun KPI principale è calcolato dalla pagina del browser.
@@ -68,6 +70,29 @@ source_watermark, source_age_seconds, query_generated_at e population_generated_
 Quest’ultimo collega pagina current e aggregati alla medesima generazione della cache.
 Current coverage=`current_scoring_population`; history=`persisted_prediction_history`.
 Empty: items=[], total=0, total_pages=1. Nessun mock.
+
+## Aggregati server-side
+
+```text
+GET /public/predictions/current/aggregate?route=907
+GET /public/predictions/history/aggregate?route=907&from=2026-10-29T00:00:00Z
+```
+
+Gli aggregati usano gli stessi filtri delle pagine (`route`, `stop`, `query`, `mode`,
+`risk_class`, `from`, `to`) ma non accettano `page`, `page_size` né `sort` (422).
+Calcolano su tutta la popolazione filtrata, non sulle righe visibili, così i KPI di una
+linea con più di 20 osservazioni non dipendono dalla pagina. Risposta: `coverage`,
+`total`, `major_count`, `source_watermark`, `query_generated_at` più:
+
+- current: `observed_delay_count`, `average_probability`, `max_observed_delay_seconds`
+  (null se non ci sono osservazioni) e `probability_bins`, 10 intervalli
+  `lower <= p < upper` (1.0 nell’ultimo) con `count` e `percentage`;
+- history: `hourly`, al massimo 72 bucket `date_trunc('hour', UTC)` con `count` e
+  `major_count`, in ordine cronologico.
+
+Nessuna feature, nessun SQL arbitrario. Errori: 422 schema, 504 timeout, 503 non
+disponibile, con lo stesso corpo sanificato delle pagine. Con `mode` diverso da `all`
+lo storico risponde 503, come la pagina.
 
 | Parametro | Valori ammessi |
 | --- | --- |

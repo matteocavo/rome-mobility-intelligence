@@ -21,7 +21,7 @@ Pages usa il source GitHub Actions. Nessun workflow di feature branch pubblica i
 L'origin API pubblico compilato nel bundle è
 `https://rome-mobility-intelligence-matteocavo.onrender.com`. Il browser deve usare
 esclusivamente `GET /public/summary`, `/public/predictions/current`,
-`/public/predictions/history`, `/public/routes` e `/public/route-map`; nessuna chiave o
+`/public/predictions/history`, i due `/aggregate`, `/public/routes` e `/public/route-map`; nessuna chiave o
 endpoint privato va inserito nel frontend. Il backend usa i dati correnti Databricks e
 lo storico Neon, senza mock automatici. Il modello e i suoi artifact restano privati.
 
