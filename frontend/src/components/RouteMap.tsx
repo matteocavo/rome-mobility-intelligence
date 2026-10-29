@@ -292,8 +292,8 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         </h4>
         <p className="text-xs text-[#6B7280] mt-2 max-w-md leading-relaxed">
           {language === 'it'
-            ? 'I dati per questa linea sono attualmente registrati a livello tabellare senza coordinate geografiche collegate nello stream.'
-            : 'Operational telemetry for this route is currently reported at the tabular feed level without geocoded stop positions.'}
+            ? 'Fermate reali da GTFS statico e geometria della corsa quando abbinabile. Nessuna posizione veicolo disponibile; nessun marker veicolo simulato.'
+            : 'Real static GTFS stops and trip geometry where matched. Vehicle positions are unavailable; no simulated vehicle markers.'}
         </p>
       </div>
     );

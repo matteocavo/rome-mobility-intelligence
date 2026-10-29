@@ -6,6 +6,7 @@ import { Translations, Language } from '../i18n/translations';
 
 interface LineDetailViewProps {
   routeId: string;
+  catalogRouteType?: number;
   predictions: CurrentPrediction[];
   /** Server-side aggregate over every current observation of the line (not the visible page). */
   aggregate: PredictionAggregate | null;
@@ -18,6 +19,7 @@ interface LineDetailViewProps {
 
 export const LineDetailView: React.FC<LineDetailViewProps> = ({
   routeId,
+  catalogRouteType,
   predictions,
   aggregate,
   aggregateLoading,
@@ -30,8 +32,9 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
   const [expandedTechId, setExpandedTechId] = useState<string | null>(null);
 
   const lineVehicles = predictions.filter((p) => p.route_id === routeId);
-  const isTram = lineVehicles[0]?.route_type === 0;
-  const mode = isTram ? 'Tram' : lineVehicles[0]?.route_type === 3 ? 'Bus' : '—';
+  const routeType = catalogRouteType ?? lineVehicles[0]?.route_type;
+  const isTram = routeType === 0;
+  const mode = isTram ? 'Tram' : routeType === 3 ? 'Bus' : '—';
 
   const formatDelay = (seconds: number | null | undefined) => {
     if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return t.states.noValue;
