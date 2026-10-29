@@ -1,6 +1,6 @@
 # Rome Mobility Intelligence v1.0.0
 
-**Orchestrazione OCI opzionale: deployment preparato; provisioning non ancora eseguito.**
+**Orchestrazione OCI opzionale — Deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
 Il test con container reali su GitHub Actions classifica E2 Micro come **MARGINAL**:
 le verifiche funzionali passano senza OOM o swap, ma avvio e riavvio sotto CPU limitata
