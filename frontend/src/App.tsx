@@ -211,6 +211,7 @@ export function App() {
         {selectedLine ? (
           <LineDetailView
             routeId={selectedLine}
+            catalogRouteType={catalog.find(route => route.route_id === selectedLine)?.route_type}
             predictions={currentPredictions}
             aggregate={currentAggregate}
             aggregateLoading={currentAggregateLoading}
