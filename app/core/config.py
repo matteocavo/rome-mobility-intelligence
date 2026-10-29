@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     rate_limit_inference: int = Field(default=10, ge=1, le=1000)
     rate_limit_write: int = Field(default=2, ge=1, le=1000)
     rate_limit_read: int = Field(default=60, ge=1, le=1000)
+    rate_limit_public: int = Field(default=30, ge=1, le=60)
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

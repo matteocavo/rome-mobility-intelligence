@@ -5,7 +5,7 @@ import pandas as pd
 from app.contracts.inference import PredictRequest
 from app.contracts.operational_ml import CONTRACT, FEATURES, HASH, KEY
 from app.core.config import Settings
-from app.data.databricks_client import DatabricksClient, identifier
+from app.data.databricks_client import DataAccessError, DatabricksClient, identifier
 
 TABLE = "`rome_transport`.`features`.`next_stop_delay_scoring`"
 
@@ -17,6 +17,18 @@ class CurrentScoringRepository:
     def latest(self, limit: int) -> pd.DataFrame:
         if type(limit) is not int or not 1 <= limit <= self.settings.inference_max_batch_rows:
             raise ValueError("Invalid scoring limit")
+        return self._latest(limit, self.settings.inference_max_bytes)
+
+    def population(self) -> pd.DataFrame:
+        # Fixed server budget; never a browser-supplied limit or a truncated population.
+        frame = self._latest(50000, 48_000_000, allow_empty=True)
+        if frame.empty:
+            return frame
+        if not frame.snapshot_rows.eq(len(frame)).all():
+            raise DataAccessError("Current population exceeds the serving budget")
+        return frame
+
+    def _latest(self, limit, max_bytes, *, allow_empty=False):
         columns = ", ".join(identifier(x) for x in CONTRACT["inference"]["columns"])
         grain = ", ".join(identifier(x) for x in KEY)
         # Windows inspect lineage across the whole latest feed, before LIMIT.
@@ -41,8 +53,10 @@ class CurrentScoringRepository:
             query,
             {"requested_limit": limit},
             max_rows=limit,
-            max_bytes=self.settings.inference_max_bytes,
+            max_bytes=max_bytes,
         )
+        if frame.empty and allow_empty:
+            return frame
         if frame.empty:
             raise ValueError("No current scoring input available")
         if frame[list(KEY)].isna().any().any() or not frame.grain_rows.eq(1).all():

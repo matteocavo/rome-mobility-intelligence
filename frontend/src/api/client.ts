@@ -1,0 +1,130 @@
+/** Anonymous read-only browser boundary. No operational endpoints or mock fallback. */
+import type { CurrentPrediction, CurrentPredictionsResponse, HistoryRecord, HistoryResponse,
+  HistoryQueryParams, ModelInfoResponse, PageParams, PageInfo } from '../types/api';
+import { DOCUMENTED_MODEL_INFO } from './modelInfo';
+
+const APPROVED_ORIGIN = 'https://rome-mobility-intelligence-matteocavo.onrender.com';
+const configuredOrigin = import.meta.env?.VITE_PUBLIC_API_URL || APPROVED_ORIGIN;
+if (configuredOrigin.replace(/\/$/, '') !== APPROVED_ORIGIN) throw new Error('Invalid public API origin');
+const BASE_URL = import.meta.env?.DEV ? '' : APPROVED_ORIGIN;
+const ROUTES = new Set(['/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history']);
+const MAX_RESPONSE_BYTES = 256000;
+export class PublicApiError extends Error {
+  constructor(readonly kind: 'unavailable' | 'response' | 'query') { super(kind); }
+}
+const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export async function publicGet(path: string, query = new URLSearchParams(),
+  progress?: (message: string, seconds: number) => void): Promise<any> {
+  if (!ROUTES.has(path)) throw new PublicApiError('query');
+  const start = Date.now();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    progress?.(elapsed < 30 ? 'Waking data service…' : 'Connecting to the latest mobility data…', elapsed);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`${BASE_URL}${path}${query.size ? '?' + query : ''}`, {
+        method: 'GET', credentials: 'omit', redirect: 'error', signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        if (![429, 502, 503, 504].includes(response.status)) throw new PublicApiError('response');
+      } else {
+        if (!response.headers.get('content-type')?.includes('application/json')) throw new PublicApiError('response');
+        const reader = response.body?.getReader();
+        if (!reader) throw new PublicApiError('response');
+        const chunks: Uint8Array[] = []; let size = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > MAX_RESPONSE_BYTES) { await reader.cancel(); throw new PublicApiError('response'); }
+          chunks.push(value);
+        }
+        const raw = new Uint8Array(size); let offset = 0;
+        for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
+        return JSON.parse(new TextDecoder().decode(raw));
+      }
+    } catch (error) {
+      if (error instanceof PublicApiError) throw error;
+      // Fixed classification only; never expose raw body/network diagnostics.
+    } finally { clearTimeout(timeout); }
+    if (attempt < 3) await pause((attempt + 1) * 10000);
+  }
+  throw new PublicApiError('unavailable');
+}
+const optionalText = (v: unknown) => typeof v === 'string' && v.length <= 512 ? v : undefined;
+const optionalNumber = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+export function parseRows(data: any): CurrentPrediction[] {
+  if (!['current_scoring_population','persisted_prediction_history','persisted_predictions_only'].includes(data?.coverage) || !Array.isArray(data.predictions) || data.predictions.length > 100) throw new PublicApiError('response');
+  return data.predictions.map((row: any) => {
+    const p = row.major_delay_probability, threshold = row.threshold;
+    if (!Number.isFinite(p) || p < 0 || p > 1 || !Number.isFinite(threshold) || threshold <= 0 || threshold >= 1 ||
+      typeof row.predicted_major_delay !== 'boolean' || row.predicted_major_delay !== (p >= threshold) ||
+      !optionalText(row.stop_id) || !optionalText(row.observation_id) || !Number.isFinite(Date.parse(row.source_watermark))) throw new PublicApiError('response');
+    return {
+      route_id: optionalText(row.route_id) ?? null, stop_id: row.stop_id,
+      trip_id: optionalText(row.trip_id) ?? row.observation_id, vehicle_id: optionalText(row.vehicle_id) ?? null,
+      feed_timestamp: Date.parse(row.source_watermark) / 1000,
+      current_arrival_delay_seconds: optionalNumber(row.observed_current_delay_seconds) ?? null,
+      major_delay_probability: p, predicted_major_delay: row.predicted_major_delay, threshold,
+      stop_name: optionalText(row.stop_name), route_short_name: optionalText(row.route_short_name),
+      route_type: optionalNumber(row.route_type), stop_sequence: optionalNumber(row.stop_sequence),
+      stop_lat: optionalNumber(row.stop_lat), stop_lon: optionalNumber(row.stop_lon),
+      vehicle_lat: optionalNumber(row.vehicle_lat), vehicle_lon: optionalNumber(row.vehicle_lon),
+    };
+  });
+}
+const queryFor = (params: PageParams = {}) => {
+  const page=params.page ?? 1, size=params.page_size ?? 20;
+  if (!Number.isInteger(page) || page<1 || ![10,20,50].includes(size)) throw new PublicApiError('query');
+  const q=new URLSearchParams({page:String(page),page_size:String(size)});
+  for (const key of ['route','stop','query','risk_class','sort','mode','from','to'] as const) {
+    if (params[key]) q.set(key,String(params[key]));
+  }
+  return q;
+};
+const pagination = (raw: any): PageInfo => {
+  if (!Number.isInteger(raw.total) || raw.total<0 || !Number.isInteger(raw.page) || raw.page<1 ||
+      ![10,20,50].includes(raw.page_size) || !Number.isInteger(raw.total_pages) || raw.total_pages<1 ||
+      !Array.isArray(raw.items) || raw.items.length>raw.page_size) throw new PublicApiError('response');
+  return {total:raw.total,page:raw.page,page_size:raw.page_size,total_pages:raw.total_pages};
+};
+export const api = {
+  getBaseUrl: () => APPROVED_ORIGIN,
+  async getSummary(progress?: (message:string,seconds:number)=>void) {
+    const value = await publicGet('/public/summary',undefined,progress);
+    if (value?.coverage !== 'current_scoring_population' || !Number.isInteger(value.scored_count) || value.scored_count < 0 ||
+        !Number.isInteger(value.route_count) || value.route_count < 0 || !value.observed_delay_distribution ||
+        ['early','minor','moderate','major','critical'].some(key => !Number.isInteger(value.observed_delay_distribution[key]) || value.observed_delay_distribution[key] < 0)) throw new PublicApiError('response');
+    return value;
+  },
+  async getCurrentPredictions(limit = 20, _forceMock = false,
+    progress?: (message: string, seconds: number) => void, params: PageParams = {})
+    : Promise<{data: CurrentPredictionsResponse; isFallback: boolean; pagination: PageInfo}> {
+    if (![10,20,50].includes(limit)) throw new PublicApiError('query');
+    const raw=await publicGet('/public/predictions/current',queryFor({page_size:limit as 10|20|50,...params}),progress);
+    const page=pagination(raw);
+    const predictions=parseRows({...raw,predictions:raw.items});
+    return {isFallback:false,pagination:page,data:{
+      model_version:'',feature_contract_hash:'',threshold:predictions[0]?.threshold ?? .35,
+      source_watermark:raw.source_watermark ?? '',prediction_generated_at:raw.population_generated_at ?? raw.query_generated_at,
+      source_age_seconds:optionalNumber(raw.source_age_seconds) ?? NaN,rows:predictions.length,predictions,
+    }};
+  },
+  async getHistory(params: PageParams = {})
+    : Promise<{data: HistoryResponse; isFallback: boolean; pagination: PageInfo}> {
+    const raw=await publicGet('/public/predictions/history',queryFor({sort:'time_desc',...params}));
+    const page=pagination(raw), parsed=parseRows({...raw,predictions:raw.items});
+    const records: HistoryRecord[]=parsed.map((row,index)=>({
+      ...row,id:raw.items[index].observation_id,entity_id:'',trip_id:row.trip_id!,
+      stop_id:row.stop_id!,stop_sequence:row.stop_sequence ?? 0,target_next_stop_id:raw.items[index].target_next_stop_id,
+      created_at:raw.items[index].prediction_generated_at,prediction_generated_at:raw.items[index].prediction_generated_at,
+      source_feed_timestamp:row.feed_timestamp,source_silver_version:null,
+      feature_preparation_batch_id:null,model_version:'',feature_contract_hash:'',
+    }));
+    return {isFallback:false,pagination:page,data:{rows:records.length,query_generated_at:raw.query_generated_at,predictions:records}};
+  },
+  async getModelInfo(): Promise<ModelInfoResponse> { return structuredClone(DOCUMENTED_MODEL_INFO); },
+};

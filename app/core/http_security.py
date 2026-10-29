@@ -27,6 +27,7 @@ class RateBudgets:
             "inference": cfg.rate_limit_inference,
             "write": cfg.rate_limit_write,
             "read": cfg.rate_limit_read,
+            "public": cfg.rate_limit_public,
         }
         self.buckets = {name: deque() for name in self.limits}
         self.clock, self.lock = clock, threading.Lock()
@@ -123,7 +124,9 @@ class HttpSecurity:
                 scope.setdefault("state", {})["service_authenticated"] = True
             if (path, method) != ("/health", "GET") and method != "OPTIONS":
                 bucket = (
-                    "inference"
+                    "public"
+                    if path.startswith("/public/")
+                    else "inference"
                     if path in {"/predict", "/predict/batch", "/predictions/current"}
                     else ("write" if path == "/predictions/current/persist" else "read")
                 )

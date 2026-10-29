@@ -217,3 +217,11 @@ Copyright 2026 Matteo Cavo.
 Third-party components and public transport data remain under their applicable
 upstream licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for Roma
 data attribution, licensing exceptions and the scope of the original work.
+
+## Frontend pubblico
+
+Il dashboard React/Vite è isolato in [`frontend/`](frontend/README.md), con interfaccia
+IT/EN e mappa Leaflet. Usa le API pubbliche read-only per il campione di predizioni
+persistite, senza endpoint autenticati né fallback automatici ai mock. Build e deploy
+del backend FastAPI restano indipendenti. I limiti attuali di geografia e modalità
+sono documentati nel contratto frontend.

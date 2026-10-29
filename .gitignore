@@ -62,3 +62,10 @@ venv/
 *.tgz
 /artifacts/*
 !/artifacts/.gitkeep
+
+# Frontend local exports, build/dependency state
+node_modules/
+*.tsbuildinfo
+/UI_UX/
+/.worktrees/
+frontend/tests/.compiled-*/
