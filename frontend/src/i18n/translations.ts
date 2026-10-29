@@ -642,7 +642,7 @@ export const translations: Record<Language, Translations> = {
     },
     status: {
       liveApi: 'Latest available snapshot',
-      demoData: 'Demo data',
+      demoData: 'Synthetic data',
       wakingService: 'Waking data service…',
       connectingData: 'Connecting to latest data…',
       refresh: 'Refresh',

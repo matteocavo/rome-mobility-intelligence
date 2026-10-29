@@ -160,7 +160,7 @@ Il client server-side FastAPI usa soltanto URL HTTPS configurata, host esplicita
 secret privato e payload minimo. Nessuna n8n Admin API/key; Compose OCI preparato,
 test con container reali eseguito su GitHub Actions, nessuna VM OCI ancora provisionata.
 [Import, autenticazione e confini](docs/N8N_CLOUD_ORCHESTRATION.md).
-Lo smoke end-to-end resta pending: n8n Cloud non può raggiungere in sicurezza il FastAPI locale.
+Il backend production è disponibile via HTTPS; lo smoke dei workflow n8n resta una verifica opzionale separata.
 Nessun deploy pubblico o tunnel è approvato o creato.
 
 ## Verifiche
@@ -238,7 +238,7 @@ data attribution, licensing exceptions and the scope of the original work.
 ## Frontend pubblico
 
 Il dashboard React/Vite è isolato in [`frontend/`](frontend/README.md), con interfaccia
-IT/EN e mappa Leaflet. Usa le API pubbliche read-only per il campione di predizioni
+IT/EN e mappa Leaflet. Usa le API pubbliche read-only per la popolazione scoring corrente e le predizioni
 persistite, senza endpoint autenticati né fallback automatici ai mock. Build e deploy
 del backend FastAPI restano indipendenti. I limiti attuali di geografia e modalità
 sono documentati nel contratto frontend.

@@ -160,7 +160,7 @@ export function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {error && <div role="alert" className="bg-white border border-[#8E001C] rounded-xl p-4">
-          <p>{t.states.unavailable}. {language === 'it' ? 'Nessun dato dimostrativo viene mostrato.' : 'No demo data is shown.'}</p>
+          <p>{t.states.unavailable}. {language === 'it' ? 'Nessun dato dimostrativo viene mostrato.' : 'No synthetic data is shown.'}</p>
           <button type="button" onClick={() => loadData(true)} className="underline">{language === 'it' ? 'Riprova' : 'Retry'}</button>
         </div>}
         {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{t.states.noCurrentData}</p>}

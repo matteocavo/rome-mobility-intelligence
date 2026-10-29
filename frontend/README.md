@@ -1,7 +1,7 @@
 # Frontend pubblico Rome Mobility Intelligence
 
 React 19 / Vite 6 / TypeScript. Italiano predefinito, inglese secondario.
-Design AI Studio preservato: nessun redesign o deploy in questa PR.
+Interfaccia pubblica v1.0.0 su GitHub Pages, con backend Render Free.
 
 ## Comandi
 
@@ -39,8 +39,8 @@ Never place RMI_SERVICE_API_KEY or any backend secret in browser code.
 
 Dev server solo localhost:3000; proxy `/public` verso localhost:8000. Avviare il
 backend con la sua configurazione privata già approvata; non copiarla in Vite.
-Il proxy non esiste in build production. Il contratto aggiunto da questa PR non è
-ancora deployato su Render; produzione nuova origin/CORS è uno step separato.
+Il proxy non esiste in build production. Il contratto è deployato su Render; CORS ammette esattamente
+`https://matteocavo.github.io`, senza wildcard.
 
 ## Popolazione e tabelle
 
@@ -79,15 +79,15 @@ nomi mancanti. [Contratto e prove](../docs/FRONTEND_API_CONTRACT.md).
 
 ## Deploy e capacità
 
-Nessun provider creato e nessun cambio Render/Docker. Possibile futuro host statico
-Free separato. Prima del deploy: review/merge, deploy backend esplicito, verifica API,
-configurazione dell’esatto origin HTTPS in CORS_ALLOWED_ORIGINS, poi deploy statico.
+Frontend live: <https://matteocavo.github.io/rome-mobility-intelligence/>.
+Backend live: <https://rome-mobility-intelligence-matteocavo.onrender.com>.
+Deploy statico tramite GitHub Actions da main; configurazione CORS verificata.
 Nessuna wildcard o service key nel browser. Costo infrastrutturale obiettivo €0/mese.
 
 Prova locale: 23.084 righe, 296 linee, 8.910 rischi major; tabelle default 20 righe.
 Backend cap 50.000 righe / 48 MB export, cache 5 minuti, un refresh/processo; nessun
 risultato troncato presentato come completo. Peak locale circa 404 MiB: verificare
-il margine e la CPU del singolo worker Render Free prima del deploy. La sorgente
+il margine e la CPU del singolo worker Render Free durante l’esercizio. La sorgente
 provata aveva watermark 2026-10-28T17:47:52Z: freshness vecchia mostrata esplicitamente,
 non corretta attivando/modificando scheduler in questa task.
 
@@ -131,4 +131,4 @@ in timestamp ISO timezone-aware prima della richiesta.
 [Hardening finale PR24](../docs/PR24_HARDENING.md): memoria misurata, quota pubblica
 120/client + ceiling globale 1.200/minuto, budget richieste UI e gate CORS/proxy Render.
 Nessun proxy viene fidato automaticamente; gli esatti CIDR devono essere verificati
-prima del deploy. In locale CORS resta chiuso e si usa il proxy Vite same-origin.
+in production. In locale CORS resta chiuso e si usa il proxy Vite same-origin.
