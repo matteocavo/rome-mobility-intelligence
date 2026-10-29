@@ -1,6 +1,6 @@
-# Rome Mobility Intelligence
+# Rome Mobility Intelligence v1.0.0
 
-**Deployment preparato; provisioning non ancora eseguito.**
+**Orchestrazione OCI opzionale: deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
 Il test con container reali su GitHub Actions classifica E2 Micro come **MARGINAL**:
 le verifiche funzionali passano senza OOM o swap, ma avvio e riavvio sotto CPU limitata
@@ -12,11 +12,11 @@ richiedono circa 213 e 194 secondi. Questo risultato non autorizza il provisioni
 **Progetto collegato:** [Rome Public Transport Reliability & Delay Prediction](https://github.com/matteocavo/rome-public-transport-reliability),
 il repository Data/ML che alimenta questo runtime applicativo.
 
-API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
-Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**, per review.
+Applicazione pubblica **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
+Stato: **v1.0.0 — frontend GitHub Pages e backend Render Free live, prediction history Neon attiva**.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
-Nessuno SLA live. La pubblicazione del frontend è in preparazione e dipende dal merge
-della PR e dall'aggiornamento/verifica del backend Render. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
+Nessuno SLA real-time garantito. Applicazione: <https://matteocavo.github.io/rome-mobility-intelligence/>.
+Backend: <https://rome-mobility-intelligence-matteocavo.onrender.com>. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 **P0: infrastruttura ricorrente a 0 EUR.**
 **Orchestrator low-code principale previsto: n8n Community Edition su OCI Always Free**. Il progetto mantiene un layer
@@ -123,22 +123,21 @@ dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query 
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
 Prediction history PostgreSQL è opzionale e disabilitata di default.
 
-## Frontend pubblico (preparazione)
+## Frontend pubblico — v1.0.0
 
-URL prevista: <https://matteocavo.github.io/rome-mobility-intelligence/>.
+URL production: <https://matteocavo.github.io/rome-mobility-intelligence/>.
 Il frontend React/Vite usa GitHub Pages e chiama soltanto le API anonime read-only del
 backend Render; le credenziali del servizio, Databricks, Neon e l'artifact del modello
 restano lato server. Il backend legge i dati operativi da Databricks e lo storico da Neon.
 Il bundle di produzione non contiene mock o fallback sintetici: se l'API non è disponibile,
 l'interfaccia mostra lo stato di caricamento/errore e consente un nuovo tentativo.
 
-La pubblicazione è configurata per GitHub Actions, ma il workflow parte solo da `main`;
-la pagina non è dichiarata live finché PR, deploy backend e smoke test con dati reali non
-sono completati. Il servizio Render Free può andare in sleep e avere un cold start; non è
+La pubblicazione usa GitHub Actions da `main`; frontend e backend sono live e gli
+endpoint pubblici sono stati verificati su dati reali. Il servizio Render Free può andare in sleep e avere un cold start; non è
 garantito un aggiornamento real-time. Geografia e forme derivano dal catalogo GTFS statico;
 non vengono mostrate posizioni live o simulate dei veicoli.
 
-L'infrastruttura di questa preparazione non introduce servizi o costi ricorrenti. Render
+L'infrastruttura mantiene il target ricorrente di 0 EUR entro i limiti dei piani gratuiti. Render
 rimane sul piano Free esistente. Il codice sorgente è Apache-2.0; il modello reale resta
 privato e non viene incluso nel repository né nel sito statico.
 Dettagli, stato e blocker: [deployment production](docs/PRODUCTION_DEPLOYMENT.md).
@@ -193,8 +192,7 @@ delle API pandas/sklearn; non viene dichiarata copertura statica completa.
 2. Acquisire nuove date TEST indipendenti e rivalidare prima del serving operativo.
 3. Accettare freshness, autenticazione e serving inference.
 4. Preparare il deployment sicuro prima dello smoke n8n Cloud; mantenere i workflow inattivi.
-5. Completare il deploy pubblico dopo la revisione, la verifica dell'ingresso proxy e gli
-   smoke test reali; la release v1.0.0 richiede un'accettazione separata.
+5. Release pubblica v1.0.0: frontend Pages, backend Render e smoke test reali completati.
 
 Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundation.
 [Architettura e responsabilità](docs/ARCHITECTURE.md).

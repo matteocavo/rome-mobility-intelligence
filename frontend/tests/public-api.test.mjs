@@ -102,7 +102,7 @@ test('IT/EN remain structurally complete and factual', async () => {
   for (const language of ['it','en']) {
     const text=JSON.stringify(translations[language]);
     assert.match(text,/Apache License 2.0/);assert.match(text,/HistGradientBoostingClassifier/);
-    assert.doesNotMatch(text,/Machine Learning Enthusiast|v1\.0\.0/);
+    assert.doesNotMatch(text,/Machine Learning Enthusiast/);
   }
 });
 
