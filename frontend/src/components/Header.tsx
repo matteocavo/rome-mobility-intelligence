@@ -109,11 +109,23 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Integrated Status & Utilities */}
           <div className="flex items-center space-x-2 sm:space-x-2.5">
             {/* Integrated Subtle Data Status */}
-            {unavailable && !isWaking ? <span role="status" className="text-xs">{language === 'it' ? 'Dati non disponibili' : 'Data unavailable'}</span> : isWaking ? (
-              <div className="flex items-center space-x-1 px-2 py-1 text-[11px] font-medium rounded bg-[#FFF9E6] text-[#9A6700] border border-[#FEEA9F]">
-                <Activity className="w-3 h-3 animate-pulse text-[#D49000]" />
-                <span className="truncate max-w-[110px] sm:max-w-none">{wakingMessage || t.status.wakingService}</span>
-              </div>
+            {unavailable && !isWaking ? (
+              <>
+                <span role="status" className="hidden sm:inline text-xs">{language === 'it' ? 'Dati non disponibili' : 'Data unavailable'}</span>
+                <span role="status" aria-label={language === 'it' ? 'Dati non disponibili' : 'Data unavailable'} className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FDF2F4] text-[#8E001C] border border-[#F2C8D0]">
+                  <Activity className="w-3.5 h-3.5" />
+                </span>
+              </>
+            ) : isWaking ? (
+              <>
+                <div className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FFF9E6] text-[#D49000] border border-[#FEEA9F]" role="status" aria-label={wakingMessage || t.status.wakingService}>
+                  <Activity className="w-3.5 h-3.5 animate-pulse" />
+                </div>
+                <div className="hidden sm:flex items-center space-x-1 px-2 py-1 text-[11px] font-medium rounded bg-[#FFF9E6] text-[#9A6700] border border-[#FEEA9F]">
+                  <Activity className="w-3 h-3 animate-pulse text-[#D49000]" />
+                  <span className="truncate max-w-[110px] sm:max-w-none">{wakingMessage || t.status.wakingService}</span>
+                </div>
+              </>
             ) : (
               <div
                 className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]"
