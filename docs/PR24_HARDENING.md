@@ -48,7 +48,7 @@ Non aumentare worker/limiti e non autorizzare il deploy basandosi sul solo bench
 ## Rate limiting pubblico
 
 Prima: tutte le visite condividevano 30 richieste / 60 secondi.
-Ora: 120 richieste / 60 secondi per client verificato, piu' tetto globale sliding
+Ora: 120 richieste per finestra fissa di 60 secondi per client verificato, piu' tetto globale sliding
 1.200 / 60 secondi per processo. I rifiuti del client non consumano il tetto globale.
 I tre budget autenticati read/inference/write restano distinti e invariati.
 
@@ -105,8 +105,9 @@ KPI. Ricerca debounced 350 ms. Ogni GET ha max 4 tentativi transitori; il cold s
 puo' quindi aumentare i conteggi (max 16 tentativi per i quattro GET iniziali).
 React StrictMode puo' duplicare gli effect solo nello sviluppo, non nel build
 production. 4 iniziali + 20 selezioni (40) + 20 pagine/ricerche = 64, molto sotto
-120/min. Un solo IP puo' consumare al massimo il 10% del ceiling globale; utenti
-su uno stesso NAT condividono la quota per IP, comportamento intenzionale.
+120/min. Fra due finestre consecutive un client puo' avere un burst al confine: al massimo
+240 ammissioni in una finestra globale sliding (20% del ceiling 1.200), mai l'intero
+budget. Utenti sullo stesso NAT condividono la quota per IP, comportamento intenzionale.
 
 ## CORS
 
