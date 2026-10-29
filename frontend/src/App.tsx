@@ -61,7 +61,7 @@ export function App() {
   const networkGenerated=useRef<string|null>(null);
   const fetchCurrent=useCallback(async(params:PageParams)=>{
     const generation=++currentGeneration.current;
-    setCurrentLoading(true);setCurrentError(false);
+    setCurrentLoading(true);setCurrentError(false);setCurrentPredictions([]);setSelectedVehicle(null);
     try {
       const response=await api.getCurrentPredictions(params.page_size??20,false,undefined,params);
       if(generation!==currentGeneration.current)return;
@@ -111,7 +111,7 @@ export function App() {
     if(sectionId==='overview')window.scrollTo({top:0,behavior:'smooth'});
     else document.getElementById(sectionId)?.scrollIntoView({behavior:'smooth'});
   };
-  const searchCurrent=useCallback((value:string)=>{setSelectedLine(null);changeCurrent({query:value,route:undefined,page:1});},[changeCurrent]);
+  const searchCurrent=useCallback((value:string)=>{setSelectedVehicle(null);setSelectedLine(null);changeCurrent({query:value,route:undefined,page:1});},[changeCurrent]);
   const handleSelectLine=(routeId:string|null)=>{
     setSelectedLine(routeId);setSelectedVehicle(null);
     changeCurrent({route:routeId??undefined,query:undefined,page:1});
@@ -188,10 +188,7 @@ export function App() {
           <LineDetailView
             routeId={selectedLine}
             predictions={currentPredictions}
-            onBack={() => {
-              setSelectedLine(null);
-              setSelectedVehicle(null);
-            }}
+            onBack={() => handleSelectLine(null)}
             onInspectVehicle={(veh) => setSelectedVehicle(veh)}
             t={t}
             language={language}

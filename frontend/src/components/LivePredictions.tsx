@@ -39,6 +39,7 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
   const [sortBy, setSortBy] = useState<'risk' | 'delay' | 'line'>('risk');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedVehicle, setSelectedVehicle] = useState<CurrentPrediction | null>(null);
+  useEffect(()=>setSelectedVehicle(null),[predictions]);
 
   // Filter & Sort
   const filteredPredictions = useMemo(() => {
