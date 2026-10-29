@@ -1,5 +1,8 @@
 """Fixed SELECT over the latest scoring feed; never accepts client SQL/identifiers."""
 
+import logging
+import time
+
 import pandas as pd
 
 from app.contracts.inference import PredictRequest
@@ -8,6 +11,7 @@ from app.core.config import Settings
 from app.data.databricks_client import DataAccessError, DatabricksClient, identifier
 
 TABLE = "`rome_transport`.`features`.`next_stop_delay_scoring`"
+logger = logging.getLogger(__name__)
 
 
 class CurrentScoringRepository:
@@ -56,7 +60,12 @@ class CurrentScoringRepository:
             max_bytes=max_bytes,
             **({"compact_strings": True} if allow_empty else {}),
         )
+        validation_started = time.perf_counter()
         if frame.empty and allow_empty:
+            logger.info(
+                "current_contract_validation rows=0 duration_ms=%d",
+                round((time.perf_counter() - validation_started) * 1000),
+            )
             return frame
         if frame.empty:
             raise ValueError("No current scoring input available")
@@ -89,4 +98,10 @@ class CurrentScoringRepository:
                 for key, value in zip(FEATURES, values, strict=True)
             }
             PredictRequest.model_validate(clean)
+        logger.info(
+            "current_contract_validation rows=%d dataframe_bytes=%d duration_ms=%d",
+            len(frame),
+            int(frame.memory_usage(deep=True).sum()),
+            round((time.perf_counter() - validation_started) * 1000),
+        )
         return frame

@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -65,6 +66,37 @@ def test_select_parameters_and_cleanup():
     connection.close.assert_called_once()
     cursor.close.assert_called_once()
     assert connect.call_args.kwargs["use_inline_params"] is False
+    assert connect.call_args.kwargs["use_cloud_fetch"] is True
+
+
+def test_select_timing_log_has_only_safe_stages_and_aggregate_data(caplog):
+    connection, cursor = MagicMock(), MagicMock()
+    connection.cursor.return_value = cursor
+    cursor.description = [("value",)]
+    cursor.fetchone.return_value = (configured().databricks_client_id,)
+    cursor.fetchmany.side_effect = [[(1,)], []]
+
+    with caplog.at_level(logging.INFO, logger="app.data.databricks_client"):
+        DatabricksClient(configured(), lambda **kwargs: connection).select(
+            "SELECT 1 AS value", max_rows=1
+        )
+
+    record = next(
+        record for record in caplog.records if "databricks_select_timing" in record.message
+    )
+    for stage in (
+        "connection_auth_ms=",
+        "identity_check_ms=",
+        "sql_execute_ms=",
+        "first_batch_ms=",
+        "fetch_transfer_ms=",
+        "fetch_complete_ms=",
+        "dataframe_conversion_ms=",
+        "rows=1",
+        "dataframe_bytes=",
+    ):
+        assert stage in record.message
+    assert "fixture-only" not in record.message
 
 
 def test_budget_rejects_partial_export_and_closes():
