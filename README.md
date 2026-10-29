@@ -15,7 +15,8 @@ il repository Data/ML che alimenta questo runtime applicativo.
 API locale **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
 Stato: **inference sul modello reale e prediction history PostgreSQL opzionale**, per review.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
-Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
+Nessuno SLA live. La pubblicazione del frontend è in preparazione e dipende dal merge
+della PR e dall'aggiornamento/verifica del backend Render. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
 
 **P0: infrastruttura ricorrente a 0 EUR.**
 **Orchestrator low-code principale previsto: n8n Community Edition su OCI Always Free**. Il progetto mantiene un layer
@@ -120,10 +121,27 @@ Il modello si carica una volta all'avvio tramite il loader trusted. La soglia vi
 (0.35 per il modello reale corrente), mai dalla richiesta. Le fixture sintetiche sono rifiutate
 dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query SQL.
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
-Prediction history PostgreSQL è opzionale e disabilitata di default; nessun frontend.
-Autenticazione API e hosting sono fasi successive.
-Il deployment pubblico non è ancora approvato: serve un account OS di servizio separato, senza ownership
-dello storage modello e senza accesso al credential store personale dell'operatore.
+Prediction history PostgreSQL è opzionale e disabilitata di default.
+
+## Frontend pubblico (preparazione)
+
+URL prevista: <https://matteocavo.github.io/rome-mobility-intelligence/>.
+Il frontend React/Vite usa GitHub Pages e chiama soltanto le API anonime read-only del
+backend Render; le credenziali del servizio, Databricks, Neon e l'artifact del modello
+restano lato server. Il backend legge i dati operativi da Databricks e lo storico da Neon.
+Il bundle di produzione non contiene mock o fallback sintetici: se l'API non è disponibile,
+l'interfaccia mostra lo stato di caricamento/errore e consente un nuovo tentativo.
+
+La pubblicazione è configurata per GitHub Actions, ma il workflow parte solo da `main`;
+la pagina non è dichiarata live finché PR, deploy backend e smoke test con dati reali non
+sono completati. Il servizio Render Free può andare in sleep e avere un cold start; non è
+garantito un aggiornamento real-time. Geografia e forme derivano dal catalogo GTFS statico;
+non vengono mostrate posizioni live o simulate dei veicoli.
+
+L'infrastruttura di questa preparazione non introduce servizi o costi ricorrenti. Render
+rimane sul piano Free esistente. Il codice sorgente è Apache-2.0; il modello reale resta
+privato e non viene incluso nel repository né nel sito statico.
+Dettagli, stato e blocker: [deployment production](docs/PRODUCTION_DEPLOYMENT.md).
 
 ## Prediction history PostgreSQL
 
@@ -175,7 +193,8 @@ delle API pandas/sklearn; non viene dichiarata copertura statica completa.
 2. Acquisire nuove date TEST indipendenti e rivalidare prima del serving operativo.
 3. Accettare freshness, autenticazione e serving inference.
 4. Preparare il deployment sicuro prima dello smoke n8n Cloud; mantenere i workflow inattivi.
-5. React e UX/UI con Google AI Studio, in una fase successiva.
+5. Completare il deploy pubblico dopo la revisione, la verifica dell'ingresso proxy e gli
+   smoke test reali; la release v1.0.0 richiede un'accettazione separata.
 
 Nessuna modifica al core, ai Job o a Databricks è richiesta da questa foundation.
 [Architettura e responsabilità](docs/ARCHITECTURE.md).
