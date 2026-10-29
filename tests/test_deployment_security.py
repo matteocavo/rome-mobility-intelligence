@@ -83,7 +83,7 @@ def test_inference_read_and_write_budgets_are_separate():
     assert rates.admit("read") == rates.admit("write") == 0
     for _ in range(10000):
         rates.admit("inference")
-    assert set(rates.buckets) == {"inference", "read", "write"}
+    assert set(rates.buckets) == {"inference", "read", "write", "public"}
     assert sum(len(b) for b in rates.buckets.values()) == 3
     clock[0] = 60
     assert rates.admit("inference") == 0

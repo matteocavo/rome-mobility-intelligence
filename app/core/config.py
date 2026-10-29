@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,6 +52,11 @@ class Settings(BaseSettings):
     rate_limit_inference: int = Field(default=10, ge=1, le=1000)
     rate_limit_write: int = Field(default=2, ge=1, le=1000)
     rate_limit_read: int = Field(default=60, ge=1, le=1000)
+    rate_limit_public: int = Field(default=120, ge=1, le=600)
+    rate_limit_public_global: int = Field(default=1200, ge=1, le=5000)
+    public_max_client_buckets: int = Field(default=1024, ge=2, le=4096)
+    public_client_ip_header: Literal["none", "cf-connecting-ip"] = "none"
+    public_trusted_proxy_cidrs: list[str] = []
 
     @field_validator("model_artifact_path", mode="before")
     @classmethod

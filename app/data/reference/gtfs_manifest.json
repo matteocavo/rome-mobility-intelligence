@@ -1,0 +1,18 @@
+{
+  "source": "core/data/reference/gtfs_static",
+  "sha256": {
+    "routes.txt": "19ac1d2f24a096f47f9921809f7c645e57aa2027edce4592d458ee4d4c8319a6",
+    "trips.txt": "1fa7b1af6e53648fe942f8b0edc1c5af1ca36b8a5f62bf04fe27c1d0340ae8bc",
+    "stop_times.txt": "96001cb070a8d7e0f4dce28d97217d6b9ed46ea5f62fcfcd1e36fb87c988f5e3",
+    "stops.txt": "97c1b281575f6794a9c639a5527a26f95bb9bd8c2d054387a627c8f369325b62",
+    "shapes.txt": "85c9078ebfacd5fb392862be43a7647d6a742e9e1c6393e346559fe444a769c5"
+  },
+  "routes": 435,
+  "stops": 8297,
+  "trips": 166161,
+  "shapes": 1248,
+  "stop_times": 5027858,
+  "missing_trip_refs": 0,
+  "missing_stop_refs": 0,
+  "acquired_at": null
+}

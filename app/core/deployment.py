@@ -1,6 +1,7 @@
 """Provider-neutral startup policy. Failure messages never interpolate private config."""
 
 import re
+from ipaddress import ip_network
 from urllib.parse import urlsplit
 
 from app.core.config import Settings
@@ -10,6 +11,14 @@ from app.core.workload_auth import WorkloadCredentials
 
 def validate_deployment(cfg: Settings):
     try:
+        if len(cfg.public_trusted_proxy_cidrs) > 16:
+            raise ValueError
+        if bool(cfg.public_trusted_proxy_cidrs) != (cfg.public_client_ip_header != "none"):
+            raise ValueError
+        for value in cfg.public_trusted_proxy_cidrs:
+            network = ip_network(value, strict=True)
+            if network.prefixlen == 0:
+                raise ValueError
         if not cfg.allowed_hosts or any(
             not host or any(c in host for c in "*/@\\ \t\r\n") or host != host.lower()
             for host in cfg.allowed_hosts

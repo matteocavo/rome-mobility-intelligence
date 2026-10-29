@@ -63,6 +63,7 @@ class DatabricksClient:
         *,
         max_rows: int,
         max_bytes: int = 64_000_000,
+        compact_strings: bool = False,
     ) -> pd.DataFrame:
         guard_select(query)
         if max_rows < 1 or max_bytes < 1:
@@ -102,6 +103,7 @@ class DatabricksClient:
                     max_bytes,
                     cancelled,
                     attach,
+                    compact_strings,
                 )
             except DataAccessError:
                 raise
@@ -122,7 +124,16 @@ class DatabricksClient:
             raise DataAccessError(str(error)) from None
 
     def _select_connected(
-        self, connect, credentials, query, parameters, max_rows, max_bytes, cancelled, attach
+        self,
+        connect,
+        credentials,
+        query,
+        parameters,
+        max_rows,
+        max_bytes,
+        cancelled,
+        attach,
+        compact_strings=False,
     ):
         cfg = self.settings
         with (
@@ -142,6 +153,10 @@ class DatabricksClient:
             closing(connection.cursor()) as cursor,
         ):
             attach(cursor)
+            if compact_strings:
+                # fetchmany(1000) alone does not bound the connector's internal
+                # direct-result buffer (default arraysize is 10,000).
+                cursor.arraysize = 1000
             cursor.execute("SELECT current_user() AS workload_identity")
             identity = cursor.fetchone()
             if identity is None or identity[0] != cfg.databricks_client_id:
@@ -169,5 +184,12 @@ class DatabricksClient:
                     raise ExportBudgetError(
                         "Export exceeds row or memory budget; no partial result"
                     )
+                if compact_strings:
+                    # Budget uses the ORIGINAL deep size above. Dictionary encoding
+                    # changes storage only, never values, nulls or security checks.
+                    for name in frame.select_dtypes(include="object").columns:
+                        if frame[name].nunique(dropna=False) <= 64:
+                            frame[name] = frame[name].astype("category")
                 chunks.append(frame)
+                del batch
             return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame(columns=columns)

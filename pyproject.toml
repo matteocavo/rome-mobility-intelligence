@@ -24,6 +24,7 @@ include = ["app*", "scripts*"]
 
 [tool.setuptools.package-data]
 "app.contracts" = ["*.json"]
+"app.data" = ["reference/*.json", "reference/maps/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

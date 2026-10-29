@@ -1,10 +1,13 @@
-"""Pure ASGI controls applied before JSON parsing; fixed-size global rate buckets, no client map."""
+"""ASGI controls: bounded public client quotas; separate strict operational budgets."""
 
+import hashlib
 import logging
 import math
+import secrets
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
+from ipaddress import ip_address, ip_network
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -27,19 +30,84 @@ class RateBudgets:
             "inference": cfg.rate_limit_inference,
             "write": cfg.rate_limit_write,
             "read": cfg.rate_limit_read,
+            "public": cfg.rate_limit_public_global,
         }
         self.buckets = {name: deque() for name in self.limits}
         self.clock, self.lock = clock, threading.Lock()
+        self.public_limit = cfg.rate_limit_public
+        self.client_cap = cfg.public_max_client_buckets
+        self.clients = OrderedDict()
+        self._hash_key = secrets.token_bytes(16)
+        self.proxy_header = cfg.public_client_ip_header
+        self.trusted_proxies = tuple(ip_network(value) for value in cfg.public_trusted_proxy_cidrs)
 
-    def admit(self, category):
+    def client_identity(self, scope):
+        # Uvicorn proxy_headers stays disabled: scope.client is the actual socket peer.
+        # Never consume X-Forwarded-For/Forwarded or arbitrary browser client IDs.
+        peer = scope.get("client")
+        try:
+            address = ip_address(peer[0]) if peer else None
+        except ValueError:
+            address = None
+        if (
+            address is not None
+            and self.proxy_header == "cf-connecting-ip"
+            and any(address in network for network in self.trusted_proxies)
+        ):
+            supplied = [
+                value
+                for key, value in scope.get("headers", [])
+                if key.lower() == b"cf-connecting-ip"
+            ]
+            # Fail closed on missing, repeated, chained, or invalid edge headers.
+            try:
+                if len(supplied) != 1 or len(supplied[0]) > 45:
+                    raise ValueError
+                forwarded = ip_address(supplied[0].decode("ascii"))
+                if not forwarded.is_global:
+                    raise ValueError
+                address = forwarded
+            except (ValueError, UnicodeError):
+                return None
+        if address is None:
+            identity = "unknown-peer"
+        elif address.version == 6:
+            identity = str(ip_network((address, 64), strict=False))
+        else:
+            identity = str(address)
+        # No plaintext visitor IPs or headers are kept/logged in the bucket table.
+        return hashlib.blake2b(identity.encode(), key=self._hash_key, digest_size=16).digest()
+
+    def admit(self, category, client=b"unknown-peer"):
         now = self.clock()
         with self.lock:
+            if category == "public":
+                if client is None:
+                    return self.window
+                entry = self.clients.get(client)
+                if entry and now < entry[0] + self.window and entry[1] >= self.public_limit:
+                    return max(1, math.ceil(entry[0] + self.window - now))
+                if entry is None and len(self.clients) >= self.client_cap:
+                    # Never evict an active quota: identity churn cannot reset limits.
+                    expired = [
+                        key for key, value in self.clients.items() if now >= value[0] + self.window
+                    ]
+                    for key in expired:
+                        del self.clients[key]
+                    if len(self.clients) >= self.client_cap:
+                        return self.window
             bucket = self.buckets[category]
             while bucket and bucket[0] <= now - self.window:
                 bucket.popleft()
             if len(bucket) >= self.limits[category]:
                 return max(1, math.ceil(bucket[0] + self.window - now))
             bucket.append(now)
+            if category == "public":
+                start, count = self.clients.get(client, (now, 0))
+                if now >= start + self.window:
+                    start, count = now, 0
+                self.clients[client] = (start, count + 1)
+                self.clients.move_to_end(client)
             return 0
 
 
@@ -123,11 +191,17 @@ class HttpSecurity:
                 scope.setdefault("state", {})["service_authenticated"] = True
             if (path, method) != ("/health", "GET") and method != "OPTIONS":
                 bucket = (
-                    "inference"
+                    "public"
+                    if path.startswith("/public/")
+                    else "inference"
                     if path in {"/predict", "/predict/batch", "/predictions/current"}
                     else ("write" if path == "/predictions/current/persist" else "read")
                 )
-                wait = self.rates.admit(bucket)
+                wait = (
+                    self.rates.admit(bucket, self.rates.client_identity(scope))
+                    if bucket == "public"
+                    else self.rates.admit(bucket)
+                )
                 if wait:
                     return await reject(429, "Request budget exhausted", {"Retry-After": str(wait)})
             if method in {"POST", "PUT", "PATCH"}:
