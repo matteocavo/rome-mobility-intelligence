@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 
 from app.contracts.public import (
+    AggregateQuery,
     PageQuery,
+    PredictionAggregate,
     PredictionPage,
     RouteCatalog,
     RouteGeometry,
@@ -19,13 +21,21 @@ from app.services.public_summary import NetworkSummary
 router = APIRouter(prefix="/public", tags=["Public persisted data"])
 
 
-def parameters(request: Request) -> PageQuery:
+def _validated(request: Request, schema):
     if any(len(request.query_params.getlist(k)) != 1 for k in request.query_params):
         raise HTTPException(422, "Duplicate query parameters are not supported")
     try:
-        return PageQuery.model_validate(dict(request.query_params))
+        return schema.model_validate(dict(request.query_params))
     except ValidationError:
         raise HTTPException(422, "Public query schema is invalid") from None
+
+
+def parameters(request: Request) -> PageQuery:
+    return _validated(request, PageQuery)
+
+
+def aggregate_parameters(request: Request) -> AggregateQuery:
+    return _validated(request, AggregateQuery)
 
 
 def no_parameters(request: Request):
@@ -62,14 +72,28 @@ def history(request: Request, query: Annotated[PageQuery, Depends(parameters)]):
     return page_read(request, "history", query)
 
 
-def page_read(request, kind, query):
+@router.get("/predictions/current/aggregate", response_model=PredictionAggregate)
+def current_aggregate(
+    request: Request, query: Annotated[AggregateQuery, Depends(aggregate_parameters)]
+):
+    return page_read(request, "current", query, "aggregate")
+
+
+@router.get("/predictions/history/aggregate", response_model=PredictionAggregate)
+def history_aggregate(
+    request: Request, query: Annotated[AggregateQuery, Depends(aggregate_parameters)]
+):
+    return page_read(request, "history", query, "aggregate")
+
+
+def page_read(request, kind, query, operation="page"):
     try:
         service = (
             request.app.state.public_population
             if kind == "current"
             else request.app.state.public_history
         )
-        return service.page(query)
+        return getattr(service, operation)(query)
     except (DatabaseTimeout, QueryTimeoutError):
         raise HTTPException(504, "Public data query timeout") from None
     except ValueError:
