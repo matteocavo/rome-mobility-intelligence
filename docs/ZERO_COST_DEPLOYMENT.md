@@ -52,7 +52,9 @@ between this workflow's runs, not with independent manual clients/n8n.
 
 ## Schedule and failure semantics
 
-Fallback cron `17,47 * * * *` UTC performs real persistence every 30 minutes when explicitly enabled.
+Fallback cron `17,47 * * * *` UTC requests delivery twice per hour when explicitly enabled.
+It is **temporary / best-effort zero-cost fallback orchestration**, not guaranteed
+30-minute real-time scheduling. Classification: **BEST-EFFORT TEMPORARY FALLBACK**.
 This cadence does not select the future low-code production orchestrator or its schedule. To change
 cadence, review the cron in `.github/workflows/persist-current-predictions.yml`; GitHub cron
 does not interpolate repository variables. 15 minutes is not validated or required.
@@ -60,8 +62,11 @@ At 30 minutes there are 1,440 triggers/30-day month (1,488/31-day month). GitHub
 scheduled jobs and disables schedules in inactive public repositories after 60 days.
 Do not use keep-alive traffic to prevent Render sleep.
 
-The client first checks /health, then authenticated /ready. Each stage has a 120-second
-budget, at most three requests (15 seconds each) and waits 30/45 seconds. Health requires
+The client first checks /health, then authenticated /ready, sharing one 240-second
+monotonic deadline. Each stage allows at most five requests (up to 15 seconds each),
+with waits 30/45/45/45 seconds; no sleep is taken if it would exhaust the deadline.
+Readiness does not restart the wake budget. Previously each stage allowed three
+requests, 30/45-second waits and its own 120-second deadline. Health requires
 HTTP 200/status=ok. Readiness requires HTTP 200/status=ready, model_ready=true,
 artifact_integrity=verified, workload_identity_configured=true, database_configured=true,
 prediction_persistence_enabled=true. These flags do not prove source freshness or dependency
@@ -74,6 +79,11 @@ write blindly. A timed-out request may already have committed: the existing data
 constraint makes replay idempotent. A later attempt may read a newer current snapshot;
 this is not exactly-once processing. Zero inserted plus N existing is success. Optional
 history follow-up is disabled by default; its failure cannot repeat a confirmed write.
+Persistence retries are unchanged: three requests of up to 140 seconds plus 30/60-second
+waits (510 seconds). Shared warm-up plus persistence is bounded nominally to 750
+seconds (12m30s); optional history adds at most 10 seconds, below the unchanged
+15-minute workflow timeout. Socket/DNS/platform overhead can exceed these application
+budgets; the workflow timeout remains the outer bound.
 Only bounded integer counts, fixed status and retry count reach stdout. No response rows,
 source errors, credentials or remote diagnostic text are logged. Redirects and proxy-env
 inheritance are disabled; response bodies are bounded to 64 KiB.
@@ -246,3 +256,27 @@ GHCR private containers currently have free storage/transfer and Render supports
 pulls with registry credentials. It is not selected because it introduces a registry token,
 visibility/permission configuration and another model-bearing distribution boundary, none
 verified/provisioned here. Public repository visibility must never imply public model package.
+
+## Observed automatic delivery and safe failure diagnosis (2026-10-29)
+
+Automatic event=schedule run 40758574574 succeeded on 2026-10-28 at 19:55 UTC:
+100 evaluated, 100 inserted, 0 existing, retry_count=0. Runs 40791293478
+(2026-10-29 00:01 UTC) and 40825855280 (05:52 UTC) failed in the application
+step after 144.88 and 145.31 seconds. Checkout succeeded in both. The old
+suppressed diagnostic cannot establish which stage failed; timing alone is not
+proof of a wake timeout or persistence timeout. No write replay is used to diagnose
+these historic runs. The Node.js deprecation warning is not evidence of causation.
+
+These deliveries prove automatic end-to-end execution exists, not precise
+30-minute delivery. Observed gaps were about 4h06 and 5h51. Cron is unchanged;
+no duplicate scheduler or keep-alive is introduced. n8n on OCI remains the preferred
+future scheduler, not activated here. ONLY ONE scheduler active at a time.
+
+Failures now expose only a fixed allowlisted stage: configuration, health, ready,
+persistence, persistence_response, transport, response or internal. Unknown errors
+map to internal. No response body, URL, credentials, headers, raw exception or
+traceback is emitted by the command-line handler. A transport/response failure
+identifies the failure class rather than proving which remote dependency caused it.
+Future health/ready/persistence exhaustion can be distinguished safely. No live
+workflow_dispatch is required for deterministic timeout and sanitization tests;
+production behavior remains to be observed after review/merge.

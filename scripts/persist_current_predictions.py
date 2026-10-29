@@ -10,6 +10,12 @@ import urllib.request
 from urllib.parse import urlsplit
 
 MAX_RESPONSE = 65536
+WARM_BUDGET = 240
+WARM_DELAYS = (30, 45, 45, 45, 0)
+SAFE_STAGES = frozenset({
+    "configuration", "health", "ready", "persistence", "persistence_response",
+    "transport", "response", "internal",
+})
 READY_FLAGS = (
     "model_ready",
     "workload_identity_configured",
@@ -21,7 +27,8 @@ READY_FLAGS = (
 class OrchestrationError(RuntimeError):
     def __init__(self, stage):
         # Only fixed internal stage names; never interpolate network diagnostics.
-        super().__init__(f"Prediction orchestration failed: {stage}")
+        self.stage = stage if type(stage) is str and stage in SAFE_STAGES else "internal"
+        super().__init__(f"Prediction orchestration failed: {self.stage}")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -104,9 +111,9 @@ class Client:
         except Exception:
             raise OrchestrationError("response") from None
 
-    def warm(self, path, predicate, stage):
-        deadline = self.clock() + 120
-        for attempt, delay in enumerate((30, 45, 0)):
+    def warm(self, path, predicate, stage, *, deadline=None):
+        deadline = self.clock() + WARM_BUDGET if deadline is None else deadline
+        for attempt, delay in enumerate(WARM_DELAYS):
             remaining = deadline - self.clock()
             if remaining <= 0:
                 break
@@ -115,14 +122,16 @@ class Client:
                 return
             if status not in {0, 502, 503, 504} and not (path == "/ready" and status == 200):
                 raise OrchestrationError(stage)
-            if attempt < 2 and deadline - self.clock() > delay:
+            if attempt < len(WARM_DELAYS) - 1 and deadline - self.clock() > delay:
                 self.sleep(delay)
             else:
                 break
         raise OrchestrationError(stage)
 
     def run(self, *, history=False):
-        self.warm("/health", lambda d: d.get("status") == "ok", "health")
+        # One shared wake deadline, not a new four-minute budget for each stage.
+        deadline = self.clock() + WARM_BUDGET
+        self.warm("/health", lambda d: d.get("status") == "ok", "health", deadline=deadline)
         self.warm(
             "/ready",
             lambda d: (
@@ -131,6 +140,7 @@ class Client:
                 and d.get("artifact_integrity") == "verified"
             ),
             "ready",
+            deadline=deadline,
         )
         for attempt, delay in enumerate((30, 60, 0)):
             status, data = self.request(
@@ -167,8 +177,13 @@ def main():
             os.environ.get("RMI_API_BASE_URL", ""), os.environ.get("RMI_SERVICE_API_KEY", "")
         )
         print(json.dumps(client.run(history=os.environ.get("RMI_FETCH_HISTORY") == "true")))
+    except OrchestrationError as error:
+        # Revalidate at the output boundary; never stringify an arbitrary exception.
+        stage = error.stage
+        safe = stage if type(stage) is str and stage in SAFE_STAGES else "internal"
+        raise SystemExit(f"Prediction orchestration failed: {safe}") from None
     except Exception:
-        raise SystemExit("Prediction orchestration failed; diagnostics suppressed") from None
+        raise SystemExit("Prediction orchestration failed: internal") from None
 
 
 if __name__ == "__main__":

@@ -74,15 +74,15 @@ def test_retry_exhaustion_is_bounded(stage):
         "ready": [(200, {"status": "ok"})],
         "persistence": [(200, {"status": "ok"}), (200, READY)],
     }[stage]
-    client = client_with([*preceding, *[(503, None)] * 3])
+    client = client_with([*preceding, *[(503, None)] * (3 if stage == "persistence" else 5)])
     with pytest.raises(OrchestrationError):
         client.run()
-    assert client.request.call_count == len(preceding) + 3
+    assert client.request.call_count == len(preceding) + (3 if stage == "persistence" else 5)
 
 
 def test_ready_flags_must_be_real_booleans_and_verified():
     bad = {**READY, "database_configured": "true"}
-    client = client_with([(200, {"status": "ok"}), *[(200, bad)] * 3])
+    client = client_with([(200, {"status": "ok"}), *[(200, bad)] * 5])
     with pytest.raises(OrchestrationError):
         client.run()
     assert all(
@@ -90,14 +90,121 @@ def test_ready_flags_must_be_real_booleans_and_verified():
     )
 
 
-def test_health_deadline_cannot_grow_past_120_seconds():
-    client = client_with([(503, None)] * 3)
-    times = iter([0, 0, 15, 45, 60, 105])
-    client.clock = lambda: next(times)
-    with pytest.raises(OrchestrationError):
-        client.warm("/health", lambda d: True, "health")
-    assert client.request.call_count <= 3
-    assert sum(c.args[0] for c in client.sleep.call_args_list) <= 75
+class FakeClock:
+    def __init__(self):
+        self.now = 0
+        self.delays = []
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.delays.append(seconds)
+        self.now += seconds
+
+
+@pytest.mark.parametrize("stage", ["health", "ready", "persistence"])
+def test_real_elapsed_timeout_budget_and_no_write_before_readiness(stage):
+    clock = FakeClock()
+    client = Client("https://api.example.org", KEY, clock=clock, sleep=clock.sleep)
+
+    def request(path, *, timeout, **kwargs):
+        if path == "/health" and stage != "health":
+            return 200, {"status": "ok"}
+        if path == "/ready" and stage == "persistence":
+            return 200, READY
+        clock.now += timeout
+        return 0, None
+
+    client.request = Mock(side_effect=request)
+    with pytest.raises(OrchestrationError, match=stage):
+        client.run()
+    assert clock.now == (510 if stage == "persistence" else 240)
+    assert clock.delays == ([30, 60] if stage == "persistence" else [30, 45, 45, 45])
+    if stage != "persistence":
+        assert not any(c.kwargs.get("method") == "POST" for c in client.request.call_args_list)
+
+
+def test_cold_start_recovers_after_old_deadline_with_shared_ready_budget():
+    clock = FakeClock()
+    client = Client("https://api.example.org", KEY, clock=clock, sleep=clock.sleep)
+
+    def request(path, *, timeout, **kwargs):
+        if path == "/health":
+            clock.now += timeout
+            return (200, {"status": "ok"}) if clock.now >= 180 else (0, None)
+        if path == "/ready":
+            clock.now += timeout
+            return 200, READY
+        return 200, SUMMARY
+
+    client.request = Mock(side_effect=request)
+    assert client.run()["retry_count"] == 0
+    assert clock.now == 195
+    assert client.request.call_args_list[-2].kwargs["timeout"] == 15
+
+
+def test_ready_cannot_restart_shared_wake_deadline():
+    clock = FakeClock()
+    client = Client("https://api.example.org", KEY, clock=clock, sleep=clock.sleep)
+
+    def request(path, *, timeout, **kwargs):
+        clock.now += timeout
+        if path == "/health" and clock.now >= 180:
+            return 200, {"status": "ok"}
+        return 0, None
+
+    client.request = Mock(side_effect=request)
+    with pytest.raises(OrchestrationError, match="ready"):
+        client.run()
+    assert clock.now <= 240
+    assert not any(c.kwargs.get("method") == "POST" for c in client.request.call_args_list)
+
+
+def test_total_wake_and_write_timeout_budget_remains_below_workflow_limit():
+    clock = FakeClock()
+    client = Client("https://api.example.org", KEY, clock=clock, sleep=clock.sleep)
+
+    def request(path, *, timeout, **kwargs):
+        if path == "/health":
+            return 200, {"status": "ok"}
+        clock.now += timeout
+        if path == "/ready" and clock.now >= 240:
+            return 200, READY
+        return 0, None
+
+    client.request = Mock(side_effect=request)
+    with pytest.raises(OrchestrationError, match="persistence"):
+        client.run()
+    assert clock.now == 750 < 15 * 60
+    assert sum(c.kwargs.get("method") == "POST" for c in client.request.call_args_list) == 3
+
+
+@pytest.mark.parametrize("stage", [
+    "configuration", "health", "ready", "persistence", "persistence_response",
+    "transport", "response", "internal", "https://private.example/SECRET", None,
+])
+def test_main_logs_fixed_safe_stage_only(stage, monkeypatch, capsys):
+    from scripts import persist_current_predictions as module
+
+    monkeypatch.setenv("RMI_API_BASE_URL", "https://api.example.org")
+    monkeypatch.setenv("RMI_SERVICE_API_KEY", KEY)
+    monkeypatch.setattr(Client, "run", Mock(side_effect=OrchestrationError(stage)))
+    expected = stage if stage in module.SAFE_STAGES else "internal"
+    with pytest.raises(SystemExit) as error:
+        module.main()
+    assert str(error.value) == f"Prediction orchestration failed: {expected}"
+    assert capsys.readouterr() == ("", "")
+
+
+def test_main_unexpected_exception_never_prints_raw_diagnostics(monkeypatch, capsys):
+    from scripts import persist_current_predictions as module
+
+    monkeypatch.setattr(module, "Client", Mock(side_effect=RuntimeError(KEY + " private-url")))
+    with pytest.raises(SystemExit) as error:
+        module.main()
+    assert str(error.value) == "Prediction orchestration failed: internal"
+    assert capsys.readouterr() == ("", "")
 
 
 def test_history_failure_cannot_repeat_successful_write():

@@ -7,7 +7,8 @@
 
 **PRIMARY LOW-CODE ORCHESTRATOR: n8n Community Edition on OCI Always Free**. Un layer low-code/no-code reale
 e significativo resta requisito P0; sara orchestratore principale se sostenibile a costo zero.
-**GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti, opt-in e senza keep-alive.
+**GitHub Actions: zero-cost fallback scheduler**, temporaneo e best-effort, opt-in e senza keep-alive.
+Il cron richiede due run/ora; la delivery non garantisce intervalli di 30 minuti.
 n8n: primary low-code integration; selected and prepared, not yet provisioned.
 Non attivare orchestratori concorrenti sullo stesso percorso. [Delivery modello privata, quote, cold start e gate](ZERO_COST_DEPLOYMENT.md).
 

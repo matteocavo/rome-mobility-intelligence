@@ -20,7 +20,9 @@ Nessuno SLA live o deploy pubblico. [Risultati e limiti](docs/REAL_MODEL_EVALUAT
 **P0: infrastruttura ricorrente a 0 EUR.**
 **Orchestrator low-code principale previsto: n8n Community Edition su OCI Always Free**. Il progetto mantiene un layer
 low-code/no-code reale e significativo, principale se tecnicamente sostenibile a costo zero.
-**GitHub Actions: zero-cost fallback scheduler**, ogni 30 minuti e solo con opt-in.
+**GitHub Actions: zero-cost fallback scheduler**, temporaneo e best-effort, solo con opt-in.
+Il cron richiede due esecuzioni/ora, ma la delivery osservata è irregolare: non garantisce
+una cadenza di 30 minuti. [Limiti e diagnostica](docs/ZERO_COST_DEPLOYMENT.md#schedule-and-failure-semantics).
 n8n: integrazione low-code scelta e preparata, non ancora installata su OCI.
 Una subscription n8n Cloud a pagamento non può essere un requisito obbligatorio.
 La delivery privata del modello e i gate del deployment reale restano da completare;
