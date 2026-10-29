@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import time
+from bisect import bisect_right
 from collections import namedtuple
 from datetime import datetime, timezone
 from threading import Lock
@@ -11,7 +12,13 @@ import numpy as np
 import pandas as pd
 
 from app.contracts.operational_ml import FEATURES
-from app.contracts.public import PublicPrediction, page_response
+from app.contracts.public import (
+    BIN_EDGES,
+    PredictionAggregate,
+    PublicPrediction,
+    page_response,
+    probability_bins,
+)
 from app.data.databricks_client import DataAccessError
 from app.services.public_summary import NetworkSummary, RouteRisk
 
@@ -19,6 +26,33 @@ from app.services.public_summary import NetworkSummary, RouteRisk
 # covers every source row; only the selected <=50 rows become response models.
 PublicRow = namedtuple("PublicRow", PublicPrediction.model_fields)
 logger = logging.getLogger(__name__)
+
+
+def row_matcher(query):
+    text_query = query.query.casefold()
+
+    def matches(entry):
+        item, text = entry
+        probability = item.major_delay_probability
+        return (
+            (not query.route or item.route_id == query.route)
+            and (not query.stop or item.stop_id == query.stop)
+            and (not text_query or text_query in text)
+            and (query.mode == "all" or item.route_type == (3 if query.mode == "bus" else 0))
+            and (
+                query.risk_class == "all"
+                or query.risk_class == "major"
+                and item.predicted_major_delay
+                or query.risk_class == "moderate"
+                and not item.predicted_major_delay
+                and probability >= 0.2
+                or query.risk_class == "regular"
+                and not item.predicted_major_delay
+                and probability < 0.2
+            )
+        )
+
+    return matches
 
 
 class PublicPopulation:
@@ -86,7 +120,8 @@ class PublicPopulation:
                 raise ValueError("Invalid current population probabilities")
             logger.info(
                 "public_population_inference rows=%d duration_ms=%d",
-                len(values), round((time.perf_counter() - inference_started) * 1000),
+                len(values),
+                round((time.perf_counter() - inference_started) * 1000),
             )
             # Inference/contract audit are complete; do not retain 47 features and
             # repeated lineage columns while building the public population.
@@ -239,8 +274,8 @@ class PublicPopulation:
         _, summary, _ = self._ensure()
         return summary
 
-    def page(self, query):
-        rows, summary, _ = self._ensure()
+    @staticmethod
+    def _check(query, rows):
         if query.from_at or query.to_at:
             raise ValueError("Time filters belong to history")
         if (
@@ -250,26 +285,40 @@ class PublicPopulation:
         ):
             raise DataAccessError("Route mode metadata unavailable")
 
-        def matches(entry):
-            item, text = entry
-            probability = item.major_delay_probability
-            return (
-                (not query.route or item.route_id == query.route)
-                and (not query.stop or item.stop_id == query.stop)
-                and (not query.query or query.query.casefold() in text)
-                and (query.mode == "all" or item.route_type == (3 if query.mode == "bus" else 0))
-                and (
-                    query.risk_class == "all"
-                    or query.risk_class == "major"
-                    and item.predicted_major_delay
-                    or query.risk_class == "moderate"
-                    and not item.predicted_major_delay
-                    and probability >= 0.2
-                    or query.risk_class == "regular"
-                    and not item.predicted_major_delay
-                    and probability < 0.2
-                )
-            )
+    def aggregate(self, query):
+        rows, summary, _ = self._ensure()
+        self._check(query, rows)
+        matches = row_matcher(query)
+        counts, total, major, observed, top = [0] * 10, 0, 0, 0, None
+        probability_sum = 0.0
+        for entry in rows:
+            if not matches(entry):
+                continue
+            item = entry[0]
+            total += 1
+            major += int(item.predicted_major_delay)
+            probability_sum += item.major_delay_probability
+            counts[bisect_right(BIN_EDGES, item.major_delay_probability)] += 1
+            delay = item.observed_current_delay_seconds
+            if delay is not None:
+                observed += 1
+                top = delay if top is None else max(top, delay)
+        return PredictionAggregate(
+            coverage="current_scoring_population",
+            total=total,
+            major_count=major,
+            observed_delay_count=observed,
+            average_probability=probability_sum / total if total else None,
+            max_observed_delay_seconds=top,
+            probability_bins=probability_bins(counts),
+            source_watermark=summary.source_watermark,
+            query_generated_at=datetime.now(timezone.utc),
+        )
+
+    def page(self, query):
+        rows, summary, _ = self._ensure()
+        self._check(query, rows)
+        matches = row_matcher(query)
 
         selected = [item for entry in rows if matches(entry) for item in [entry[0]]]
         keys = {

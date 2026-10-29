@@ -1,13 +1,13 @@
 /** Anonymous read-only browser boundary. No operational endpoints or mock fallback. */
 import type { CurrentPrediction, CurrentPredictionsResponse, HistoryRecord, HistoryResponse,
-  HistoryQueryParams, ModelInfoResponse, PageParams, PageInfo, CatalogRoute } from '../types/api';
+  HistoryQueryParams, ModelInfoResponse, PageParams, PageInfo, CatalogRoute, PredictionAggregate } from '../types/api';
 import { DOCUMENTED_MODEL_INFO } from './modelInfo';
 
 const APPROVED_ORIGIN = 'https://rome-mobility-intelligence-matteocavo.onrender.com';
 const configuredOrigin = import.meta.env?.VITE_PUBLIC_API_URL || APPROVED_ORIGIN;
 if (configuredOrigin.replace(/\/$/, '') !== APPROVED_ORIGIN) throw new Error('Invalid public API origin');
 const BASE_URL = import.meta.env?.DEV ? '' : APPROVED_ORIGIN;
-const ROUTES = new Set(['/public/route-map', '/public/routes', '/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history']);
+const ROUTES = new Set(['/public/route-map', '/public/routes', '/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history', '/public/predictions/current/aggregate', '/public/predictions/history/aggregate']);
 const MAX_RESPONSE_BYTES = 256000;
 export class PublicApiError extends Error {
   constructor(readonly kind: 'unavailable' | 'response' | 'query') { super(kind); }
@@ -85,6 +85,22 @@ const queryFor = (params: PageParams = {}) => {
   }
   return q;
 };
+export function parseAggregate(raw: any, coverage: string): PredictionAggregate {
+  const count = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
+  if (raw?.coverage !== coverage || !count(raw.total) || !count(raw.major_count) || raw.major_count > raw.total ||
+      !Array.isArray(raw.probability_bins) || raw.probability_bins.length > 10 || !Array.isArray(raw.hourly) || raw.hourly.length > 72 ||
+      !raw.probability_bins.every((b: any) => Number.isFinite(b.lower) && Number.isFinite(b.upper) && count(b.count) && Number.isFinite(b.percentage) && b.percentage >= 0 && b.percentage <= 100) ||
+      !raw.hourly.every((h: any) => Number.isFinite(Date.parse(h.hour)) && count(h.count) && count(h.major_count) && h.major_count <= h.count) ||
+      (raw.average_probability != null && !(raw.average_probability >= 0 && raw.average_probability <= 1))) throw new PublicApiError('response');
+  return {
+    coverage: raw.coverage, total: raw.total, major_count: raw.major_count,
+    observed_delay_count: optionalNumber(raw.observed_delay_count) ?? null,
+    average_probability: optionalNumber(raw.average_probability) ?? null,
+    max_observed_delay_seconds: optionalNumber(raw.max_observed_delay_seconds) ?? null,
+    probability_bins: raw.probability_bins.map((b: any) => ({ lower: b.lower, upper: b.upper, count: b.count, percentage: b.percentage })),
+    hourly: raw.hourly.map((h: any) => ({ hour: h.hour, count: h.count, major_count: h.major_count })),
+  };
+}
 const pagination = (raw: any): PageInfo => {
   if (!Number.isInteger(raw.total) || raw.total<0 || !Number.isInteger(raw.page) || raw.page<1 ||
       ![10,20,50].includes(raw.page_size) || !Number.isInteger(raw.total_pages) || raw.total_pages<1 ||
@@ -123,6 +139,14 @@ export const api = {
       source_watermark:raw.source_watermark ?? '',prediction_generated_at:raw.population_generated_at ?? raw.query_generated_at,
       source_age_seconds:optionalNumber(raw.source_age_seconds) ?? NaN,rows:predictions.length,predictions,
     }};
+  },
+  async getCurrentAggregate(params: PageParams = {}): Promise<PredictionAggregate> {
+    const q = queryFor(params); q.delete('page'); q.delete('page_size'); q.delete('sort');
+    return parseAggregate(await publicGet('/public/predictions/current/aggregate', q), 'current_scoring_population');
+  },
+  async getHistoryAggregate(params: PageParams = {}): Promise<PredictionAggregate> {
+    const q = queryFor(params); q.delete('page'); q.delete('page_size'); q.delete('sort');
+    return parseAggregate(await publicGet('/public/predictions/history/aggregate', q), 'persisted_prediction_history');
   },
   async getHistory(params: PageParams = {})
     : Promise<{data: HistoryResponse; isFallback: boolean; pagination: PageInfo}> {

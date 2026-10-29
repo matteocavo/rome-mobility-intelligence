@@ -21,10 +21,18 @@ npm run preview
 versionato; Bun non richiesto. Nessuna dipendenza Python o credenziale richiesta
 per build. `node_modules/`, `dist/` e build cache non sono versionati.
 
+## Stati dei dati
+
+KPI di linea, istogramma del modello e grafico orario dello storico provengono dagli
+endpoint `/aggregate` e non dalle righe della pagina. Durante il cold start di Render
+(503/timeout) il frontend mostra `—`, skeleton e «Dati temporaneamente non disponibili»,
+mantiene retry e conto alla rovescia e non mostra mai zeri o dati dimostrativi. Una linea
+senza osservazioni mostra «Nessun dato corrente».
+
 ## Connessione e sicurezza
 
-Production usa solo GET anonimi `/public/summary`, `/public/predictions/current`
-e `/public/predictions/history`. Origin approvato:
+Production usa solo GET anonimi `/public/summary`, `/public/predictions/current`,
+`/public/predictions/history` e i relativi `/aggregate`. Origin approvato:
 `https://rome-mobility-intelligence-matteocavo.onrender.com`.
 Unica variabile frontend: VITE_PUBLIC_API_URL, origin pubblico senza path/query/segreti.
 Never place RMI_SERVICE_API_KEY or any backend secret in browser code.

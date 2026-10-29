@@ -22,6 +22,12 @@ export interface Translations {
     analyzedVehicles: string;
     criticalAlerts: string;
   };
+  states: {
+    noCurrentData: string;
+    unavailable: string;
+    unavailableHint: string;
+    noValue: string;
+  };
   disclaimer: {
     badge: string;
     banner: string;
@@ -294,7 +300,7 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
-      liveApi: 'Dati correnti',
+      liveApi: 'Ultimo snapshot disponibile',
       demoData: 'Dati dimostrativi',
       wakingService: 'Avvio del servizio dati…',
       connectingData: 'Connessione agli ultimi dati disponibili…',
@@ -305,6 +311,12 @@ export const translations: Record<Language, Translations> = {
       lastUpdate: 'Ultimo aggiornamento',
       analyzedVehicles: 'Mezzi analizzati',
       criticalAlerts: 'Ritardi importanti',
+    },
+    states: {
+      noCurrentData: 'Nessun dato corrente',
+      unavailable: 'Dati temporaneamente non disponibili',
+      unavailableHint: 'Il servizio dati si sta avviando: riprovo automaticamente.',
+      noValue: '—',
     },
     disclaimer: {
       badge: 'Progetto indipendente',
@@ -318,7 +330,7 @@ export const translations: Record<Language, Translations> = {
       updatedMinutesAgo: (mins) => `Aggiornato ${mins} fa`,
       updatedJustNow: 'Aggiornato poco fa',
       networkStatusBar: 'Situazione rete',
-      activeTripsLabel: (count) => `${count} corse analizzate`,
+      activeTripsLabel: (count) => `${count} osservazioni analizzate`,
       majorDelayLabel: (count) => `${count} con ritardo importante`,
       typicalDelayLabel: (val) => `Ritardo tipico: ${val}`,
       worstDelayLabel: (val) => `Casi critici: ${val}`,
@@ -340,7 +352,7 @@ export const translations: Record<Language, Translations> = {
     lineDetail: {
       backToAll: '← Tutte le linee',
       lineTitle: (line) => `Linea ${line}`,
-      modeLabel: (mode) => (mode === 'Tram' ? 'Rete Tramviaria' : mode === 'Bus' ? 'Autobus' : 'Modalità non disponibile'),
+      modeLabel: (mode) => (mode === 'Tram' ? 'Rete Tramviaria' : mode === 'Bus' ? 'Autobus' : '—'),
       activeTripsCount: (count) => `${count} osservazioni correnti`,
       summaryCardTitle: 'Stato della linea',
       averageRisk: 'Rischio medio ritardo',
@@ -355,10 +367,10 @@ export const translations: Record<Language, Translations> = {
       hideTechnicalDetails: 'Nascondi dettagli',
       noCoordinates: 'Coordinate geografiche non disponibili per questo passaggio.',
       noCoordinatesPlaceholder:
-        'Mappa della linea disponibile quando i dati geografici saranno collegati all’API pubblica.',
+        'Geometria della corsa non disponibile per questa linea. Sono mostrate le fermate da GTFS statico, se disponibili.',
     },
     kpi: {
-      analyzedTrips: 'Corse analizzate',
+      analyzedTrips: 'Osservazioni analizzate',
       analyzedTripsSub: 'Campione persistito',
       majorDelays: 'Ritardi importanti',
       majorDelaysSub: 'Rischio di ritardo ≥ 5 min',
@@ -375,7 +387,7 @@ export const translations: Record<Language, Translations> = {
     },
     currentSituation: {
       title: 'Situazione attuale',
-      subtitle: 'Puntualità e stima del rischio di ritardo per ogni corsa in circolazione.',
+      subtitle: 'Puntualità e stima del rischio di ritardo sulle osservazioni trip × fermata dell’ultimo snapshot disponibile.',
       filterMode: 'Modalità:',
       severityFilter: {
         all: 'Tutti gli stati',
@@ -427,11 +439,11 @@ export const translations: Record<Language, Translations> = {
       tripStatusTitle: 'Stato dei ritardi osservati',
       tripStatusSubtitle: 'Distribuzione sull’intera popolazione scoring corrente.',
       criticalLinesTitle: 'Linee con maggiore rischio di ritardo',
-      criticalLinesSubtitle: 'Percentuale di corse con probabilità elevata di ritardo importante.',
+      criticalLinesSubtitle: 'Percentuale di osservazioni con probabilità elevata di ritardo importante.',
       criticalLinesClickHint: 'Clicca su una linea per visualizzarne la scheda.',
       delayDistTitle: 'Distribuzione dei ritardi',
       delayDistSubtitle: 'Intervalli di ritardo rilevati rispetto all’orario di programma.',
-      tripsFlagged: (flagged, total) => `${flagged} corse con ritardo importante su ${total}`,
+      tripsFlagged: (flagged, total) => `${flagged} osservazioni con ritardo importante su ${total}`,
     },
     history: {
       title: 'Storico delle osservazioni',
@@ -440,7 +452,7 @@ export const translations: Record<Language, Translations> = {
       filterAllLines: 'Tutte le linee',
       filterMajorOnly: 'Solo ritardi importanti',
       recentTrendTitle: 'Andamento ritardi per fascia oraria',
-      majorRateFeedWindow: 'Quota di corse con ritardi importanti per finestra temporale',
+      majorRateFeedWindow: 'Quota di osservazioni con ritardi importanti per finestra oraria',
       table: {
         timestamp: 'Data / Ora',
         line: 'Linea',
@@ -476,9 +488,9 @@ export const translations: Record<Language, Translations> = {
         eventTargetDesc: 'Evento target: target_realized_next_stop_delay_seconds ≥ 300 secondi (5 minuti).',
         thresholdTitle: 'Calibrazione della soglia operativa (0.35)',
         thresholdDesc:
-          'Nei contesti di dispacciamento del trasporto pubblico, una soglia standard del 50% causerebbe la perdita di troppi ritardi critici. La soglia operativa di 0.35 massimizza il richiamo (recall) limitando i falsi allarmi.',
+          'Nei contesti di dispacciamento del trasporto pubblico, una soglia standard del 50% causerebbe la perdita di troppi ritardi critici. Per questo la decisione operativa usa una soglia più bassa: soglia 0,35 selezionata sul validation set per massimizzare l\'F1.',
         metricsTitle: 'Metriche convalidate sul set di test',
-        metricsSubtitle: 'Valutazione su dataset di test indipendente fuori dal campione temporale',
+        metricsSubtitle: 'Valutazione su holdout temporale separato, valutato una sola volta',
         metricsNote: 'Metriche convalidate della versione del modello operativo:',
         metrics: {
           accuracy: 'Accuratezza: 95.65%',
@@ -507,12 +519,12 @@ export const translations: Record<Language, Translations> = {
       pipeline: {
         title: 'Pipeline dati end-to-end',
         steps: {
-          step1: { title: '01. Feed GTFS & RT', desc: 'Acquisizione orari statici e posizioni in tempo reale' },
+          step1: { title: '01. Feed GTFS & RT', desc: 'Acquisizione degli orari statici e dei feed operativi GTFS-Realtime' },
           step2: { title: '02. Lakehouse Databricks', desc: 'Ingestione Bronze e Silver su tabelle Delta' },
           step3: { title: '03. Feature Engineering', desc: 'Generazione delle 47 feature con contratto vincolato' },
           step4: { title: '04. Modello predittivo', desc: 'Inferenza rapida con HistGradientBoosting' },
           step5: { title: '05. API FastAPI', desc: 'Microservizio stateless per servire le risposte' },
-          step6: { title: '06. PostgreSQL Neon', desc: 'Persistenza storica e tracciabilità delle corse' },
+          step6: { title: '06. PostgreSQL Neon', desc: 'Persistenza storica e tracciabilità delle osservazioni' },
           step7: { title: '07. Dashboard civica', desc: 'Interfaccia utente web reattiva e accessibile' },
         },
       },
@@ -568,7 +580,7 @@ export const translations: Record<Language, Translations> = {
             desc: 'I feed con timestamp non aggiornati vengono contrassegnati per evitare di mostrare previsioni non allineate alla situazione attuale.',
           },
           dedup: {
-            title: 'Deduplicazione delle corse',
+            title: 'Deduplicazione delle osservazioni',
             desc: 'Identificazione univoca per trip_id, stop_sequence e veicolo per impedire conteggi multipli del medesimo passaggio.',
           },
           idempotence: {
@@ -577,7 +589,7 @@ export const translations: Record<Language, Translations> = {
           },
           gate: {
             title: 'Gate di validazione temporale',
-            desc: 'Verifica della coerenza tra data del servizio e timestamp del feed per scartare corse corrotte.',
+            desc: 'Verifica della coerenza tra data del servizio e timestamp del feed per scartare osservazioni corrotte.',
           },
           security: {
             title: 'Artefatto modello protetto',
@@ -594,7 +606,7 @@ export const translations: Record<Language, Translations> = {
         'La rete di trasporto pubblico di una metropoli storica come Roma è soggetta a forti variabilità causate dal traffico promiscuo, cantieri e strozzature urbane. L’obiettivo è trasformare i dati aperti in un sistema predittivo di allerta precoce per i cittadini e gli operatori.',
       howItWorksTitle: 'Come funziona',
       howItWorksText:
-        'I dati orari programmati (GTFS) e i passaggi in tempo reale (GTFS-Realtime) vengono aggregati ed elaborati tramite un modello di machine learning per stimare la probabilità di ritardo importante alla fermata successiva.',
+        'I dati orari programmati (GTFS) e i dati operativi correnti (GTFS-Realtime) vengono aggregati ed elaborati tramite un modello di machine learning per stimare la probabilità di ritardo importante alla fermata successiva.',
       dataSourceTitle: 'Dati aperti',
       dataSourceText:
         'La pipeline core usa feed GTFS e GTFS-RT aperti. Il dashboard aggrega la popolazione scoring corrente completa; le tabelle mostrano pagine di osservazioni reali e lo storico persiste in Neon. Nessun dato personale dei passeggeri.',
@@ -629,17 +641,23 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
-      liveApi: 'Current data',
+      liveApi: 'Latest available snapshot',
       demoData: 'Demo data',
       wakingService: 'Waking data service…',
       connectingData: 'Connecting to latest data…',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
-      preRelease: 'Pre-release',
+      preRelease: 'Version in development',
       dataStatus: 'Data status',
       lastUpdate: 'Last updated',
       analyzedVehicles: 'Analyzed vehicles',
       criticalAlerts: 'Major delays',
+    },
+    states: {
+      noCurrentData: 'No current data',
+      unavailable: 'Data temporarily unavailable',
+      unavailableHint: 'The data service is starting up: retrying automatically.',
+      noValue: '—',
     },
     disclaimer: {
       badge: 'Independent project',
@@ -653,7 +671,7 @@ export const translations: Record<Language, Translations> = {
       updatedMinutesAgo: (mins) => `Updated ${mins} ago`,
       updatedJustNow: 'Updated just now',
       networkStatusBar: 'Network status',
-      activeTripsLabel: (count) => `${count} trips analyzed`,
+      activeTripsLabel: (count) => `${count} observations analyzed`,
       majorDelayLabel: (count) => `${count} with major delay`,
       typicalDelayLabel: (val) => `Typical delay: ${val}`,
       worstDelayLabel: (val) => `Critical cases: ${val}`,
@@ -675,7 +693,7 @@ export const translations: Record<Language, Translations> = {
     lineDetail: {
       backToAll: '← All lines',
       lineTitle: (line) => `Line ${line}`,
-      modeLabel: (mode) => (mode === 'Tram' ? 'Tramway' : mode === 'Bus' ? 'Bus' : 'Mode unavailable'),
+      modeLabel: (mode) => (mode === 'Tram' ? 'Tramway' : mode === 'Bus' ? 'Bus' : '—'),
       activeTripsCount: (count) => `${count} current observations`,
       summaryCardTitle: 'Line Status',
       averageRisk: 'Average delay risk',
@@ -693,7 +711,7 @@ export const translations: Record<Language, Translations> = {
         'Route map will be available when geographic data is connected to the public API.',
     },
     kpi: {
-      analyzedTrips: 'Analyzed trips',
+      analyzedTrips: 'Analyzed observations',
       analyzedTripsSub: 'Persisted sample',
       majorDelays: 'Major delays',
       majorDelaysSub: 'Risk of delay ≥ 5 min',
@@ -710,7 +728,7 @@ export const translations: Record<Language, Translations> = {
     },
     currentSituation: {
       title: 'Current Situation',
-      subtitle: 'Punctuality status and estimated major delay risk for each vehicle in service.',
+      subtitle: 'Punctuality and estimated major-delay risk over the trip × stop observations of the latest available snapshot.',
       filterMode: 'Mode:',
       severityFilter: {
         all: 'All statuses',
@@ -754,7 +772,7 @@ export const translations: Record<Language, Translations> = {
         distanceMeters: 'Distance to stop',
         speedKmH: 'Instantaneous speed',
         ruleExplanation:
-          'Decision criteria: Operational threshold is calibrated at 0.35. Trips exceeding this probability are flagged for operational risk.',
+          'Decision criteria: Operational threshold is calibrated at 0.35. Observations exceeding this probability are flagged for operational risk.',
         close: 'Close card',
       },
     },
@@ -762,11 +780,11 @@ export const translations: Record<Language, Translations> = {
       tripStatusTitle: 'Observed delay status',
       tripStatusSubtitle: 'Distribution over the complete current scoring population.',
       criticalLinesTitle: 'Lines with Highest Delay Risk',
-      criticalLinesSubtitle: 'Proportion of trips on each line with elevated major delay probability.',
+      criticalLinesSubtitle: 'Share of observations on each line with elevated major-delay probability.',
       criticalLinesClickHint: 'Click any line to view its details.',
       delayDistTitle: 'Delay Distribution',
       delayDistSubtitle: 'Observed delay intervals compared against scheduled timetable.',
-      tripsFlagged: (flagged, total) => `${flagged} trips flagged with major delay out of ${total}`,
+      tripsFlagged: (flagged, total) => `${flagged} observations flagged with major delay out of ${total}`,
     },
     history: {
       title: 'Observation History',
@@ -811,9 +829,9 @@ export const translations: Record<Language, Translations> = {
         eventTargetDesc: 'Event: target_realized_next_stop_delay_seconds ≥ 300 seconds (5 minutes).',
         thresholdTitle: 'Operational Decision Threshold Calibration (0.35)',
         thresholdDesc:
-          'In operational dispatching, a default 50% cutoff misses too many major delays. The 0.35 threshold is chosen to maximize recall while maintaining high precision.',
+          'In operational dispatching, a default 50% cutoff misses too many major delays. Hence the operational decision uses a lower cutoff: threshold 0.35 selected on the validation set to maximize F1.',
         metricsTitle: 'Validated Test Set Metrics',
-        metricsSubtitle: 'Evaluated on an independent out-of-time test dataset',
+        metricsSubtitle: 'Evaluated on a separate temporal holdout, evaluated once',
         metricsNote: 'Validated metrics from the operational model evaluation:',
         metrics: {
           accuracy: 'Accuracy: 95.65%',
@@ -842,7 +860,7 @@ export const translations: Record<Language, Translations> = {
       pipeline: {
         title: 'End-to-End Data Pipeline',
         steps: {
-          step1: { title: '01. GTFS & RT Feeds', desc: 'Ingestion of static schedules and live vehicle position streams' },
+          step1: { title: '01. GTFS & RT Feeds', desc: 'Ingestion of static schedules and current GTFS-Realtime operational feeds' },
           step2: { title: '02. Databricks Lakehouse', desc: 'Bronze and Silver delta lake transformation' },
           step3: { title: '03. Feature Engineering', desc: 'Generation of 47 features under strict schema contract' },
           step4: { title: '04. Predictive Model', desc: 'Fast inference with HistGradientBoostingClassifier' },
@@ -929,7 +947,7 @@ export const translations: Record<Language, Translations> = {
         'The transit network of a historical capital like Rome faces distinct challenges: intricate historic street layouts, traffic bottlenecks, and surge volumes. This project turns open data into an actionable early warning system for commuters and transit engineers.',
       howItWorksTitle: 'How it works',
       howItWorksText:
-        'Static timetables (GTFS) and real-time vehicle streams (GTFS-RT) are processed through an ML model that predicts whether a vehicle will experience a major delay at its upcoming scheduled stop.',
+        'Static timetables (GTFS) and current operational data (GTFS-RT) operational data are processed through an ML model that predicts whether a vehicle will experience a major delay at its upcoming scheduled stop.',
       dataSourceTitle: 'Open data',
       dataSourceText:
         'The core pipeline uses open GTFS and GTFS-RT feeds. The dashboard aggregates the complete current scoring population; tables show pages of real observations and history is persisted in Neon. No passenger personal data.',

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Clock, Bus, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, MapPin, Gauge } from 'lucide-react';
-import { CurrentPrediction } from '../types/api';
+import { CurrentPrediction, PredictionAggregate } from '../types/api';
 import { RouteMap } from './RouteMap';
 import { Translations, Language } from '../i18n/translations';
 
 interface LineDetailViewProps {
   routeId: string;
   predictions: CurrentPrediction[];
+  /** Server-side aggregate over every current observation of the line (not the visible page). */
+  aggregate: PredictionAggregate | null;
+  aggregateLoading: boolean;
   onBack: () => void;
   onInspectVehicle?: (vehicle: CurrentPrediction) => void;
   t: Translations;
@@ -16,6 +19,8 @@ interface LineDetailViewProps {
 export const LineDetailView: React.FC<LineDetailViewProps> = ({
   routeId,
   predictions,
+  aggregate,
+  aggregateLoading,
   onBack,
   onInspectVehicle,
   t,
@@ -29,7 +34,7 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
   const mode = isTram ? 'Tram' : lineVehicles[0]?.route_type === 3 ? 'Bus' : '—';
 
   const formatDelay = (seconds: number | null | undefined) => {
-    if (seconds === null || seconds === undefined) return '0s';
+    if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return t.states.noValue;
     const abs = Math.abs(seconds);
     const mins = Math.floor(abs / 60);
     const secs = Math.round(abs % 60);
@@ -60,15 +65,11 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
     };
   };
 
-  const avgProb =
-    lineVehicles.length > 0
-      ? lineVehicles.reduce((acc, v) => acc + v.major_delay_probability, 0) / lineVehicles.length
-      : 0;
-
-  const maxDelay =
-    lineVehicles.length > 0
-      ? Math.max(...lineVehicles.map((v) => v.current_arrival_delay_seconds || 0))
-      : 0;
+  // KPIs come from the server aggregate over the whole line population. While it is
+  // loading or unavailable the cards show a dash, never a value derived from the visible page.
+  const totalObservations = aggregate ? aggregate.total : null;
+  const avgProb = aggregate && aggregate.total > 0 ? aggregate.average_probability : null;
+  const maxDelay = aggregate && aggregate.total > 0 ? aggregate.max_observed_delay_seconds : null;
 
   const handleSelectVehicle = (v: CurrentPrediction) => {
     setSelectedVehicleId(v.trip_id || null);
@@ -101,12 +102,18 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
               <h2 className="text-xl sm:text-2xl font-black text-[#111827] tracking-tight">
                 {t.lineDetail.lineTitle(routeId)}
               </h2>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F3F4F6] text-[#374151]">
-                {t.lineDetail.modeLabel(mode)}
-              </span>
+              {mode !== '—' && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F3F4F6] text-[#374151]">
+                  {t.lineDetail.modeLabel(mode)}
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#6B7280] mt-0.5 font-medium">
-              {t.lineDetail.activeTripsCount(lineVehicles.length)}
+              {totalObservations === null
+                ? t.states.noValue
+                : totalObservations === 0
+                  ? t.states.noCurrentData
+                  : t.lineDetail.activeTripsCount(totalObservations)}
             </p>
           </div>
         </div>
@@ -116,7 +123,7 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
           <div>
             <span className="text-[#6B7280] block text-[11px]">{t.lineDetail.averageRisk}:</span>
             <span className="font-mono font-bold text-[#111827] text-sm">
-              {(avgProb * 100).toFixed(1)}%
+              {avgProb === null ? t.states.noValue : `${(avgProb * 100).toFixed(1)}%`}
             </span>
           </div>
           <div className="h-6 w-px bg-[#E5E7EB] hidden sm:block"></div>
@@ -124,7 +131,7 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
             <span className="text-[#6B7280] block text-[11px]">{t.lineDetail.maxDelay}:</span>
             <span
               className={`font-mono font-bold text-sm ${
-                maxDelay >= 300 ? 'text-[#8E001C]' : 'text-[#111827]'
+                maxDelay !== null && maxDelay >= 300 ? 'text-[#8E001C]' : 'text-[#111827]'
               }`}
             >
               {formatDelay(maxDelay)}
@@ -163,15 +170,17 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
                 {t.lineDetail.scoredVehiclesOnLine}
               </h3>
               <span className="text-[11px] font-mono font-bold text-[#8E001C]">
-                {lineVehicles.length} {language === 'it' ? 'corse' : 'trips'}
+                {totalObservations === null || totalObservations === 0
+                  ? t.states.noValue
+                  : language === 'it'
+                    ? `${lineVehicles.length} di ${totalObservations} osservazioni`
+                    : `${lineVehicles.length} of ${totalObservations} observations`}
               </span>
             </div>
 
             {lineVehicles.length === 0 ? (
               <div className="py-8 text-center text-xs text-[#6B7280] bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
-                {language === 'it'
-                  ? 'Nessuna osservazione corrente disponibile per questa linea.'
-                  : 'No current observations available for this route.'}
+                {aggregateLoading || aggregate === null ? t.states.noValue : t.states.noCurrentData}
               </div>
             ) : (
               <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">

@@ -32,22 +32,16 @@ class PublicPrediction(ClosedSchema):
     prediction_generated_at: datetime
 
 
-class PageQuery(ClosedSchema):
-    page: int = Field(default=1, ge=1, le=100000)
-    page_size: Literal[10, 20, 50] = 20
+class FilterQuery(ClosedSchema):
+    """Filters shared by paged reads and server-side aggregates."""
+
     route: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
     stop: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
     query: str = Field(default="", max_length=100, pattern=r"^[^\x00-\x1f\x7f]*$")
     mode: Literal["all", "bus", "tram"] = "all"
     risk_class: Literal["all", "major", "moderate", "regular"] = "all"
-    sort: Literal["risk_desc", "delay_desc", "route_asc", "time_desc"] = "risk_desc"
     from_at: datetime | None = Field(default=None, alias="from")
     to_at: datetime | None = Field(default=None, alias="to")
-
-    @field_validator("page_size", mode="before")
-    @classmethod
-    def parse_page_size(cls, value):
-        return int(value) if isinstance(value, str) and value.isdecimal() else value
 
     @model_validator(mode="after")
     def validate_range(self):
@@ -57,6 +51,65 @@ class PageQuery(ClosedSchema):
         if self.from_at and self.to_at and self.from_at > self.to_at:
             raise ValueError("Invalid time range")
         return self
+
+
+class AggregateQuery(FilterQuery):
+    pass
+
+
+class PageQuery(FilterQuery):
+    page: int = Field(default=1, ge=1, le=100000)
+    page_size: Literal[10, 20, 50] = 20
+    sort: Literal["risk_desc", "delay_desc", "route_asc", "time_desc"] = "risk_desc"
+
+    @field_validator("page_size", mode="before")
+    @classmethod
+    def parse_page_size(cls, value):
+        return int(value) if isinstance(value, str) and value.isdecimal() else value
+
+
+class ProbabilityBin(ClosedSchema):
+    lower: float = Field(ge=0, le=1)
+    upper: float = Field(ge=0, le=1)
+    count: int = Field(ge=0)
+    percentage: float = Field(ge=0, le=100)
+
+
+class HourlyBucket(ClosedSchema):
+    hour: datetime
+    count: int = Field(ge=0)
+    major_count: int = Field(ge=0)
+
+
+class PredictionAggregate(ClosedSchema):
+    """Aggregates over the full filtered population, never over a visible page."""
+
+    coverage: Literal["current_scoring_population", "persisted_prediction_history"]
+    total: int = Field(ge=0)
+    major_count: int = Field(ge=0)
+    observed_delay_count: int | None = Field(default=None, ge=0)
+    average_probability: float | None = Field(default=None, ge=0, le=1)
+    max_observed_delay_seconds: float | None = None
+    probability_bins: list[ProbabilityBin] = Field(default_factory=list, max_length=10)
+    hourly: list[HourlyBucket] = Field(default_factory=list, max_length=72)
+    source_watermark: datetime | None = None
+    query_generated_at: datetime
+
+
+BIN_EDGES = [i / 10 for i in range(1, 10)]
+
+
+def probability_bins(counts):
+    total = sum(counts)
+    return [
+        ProbabilityBin(
+            lower=i / 10,
+            upper=(i + 1) / 10,
+            count=count,
+            percentage=round(100 * count / total, 2) if total else 0.0,
+        )
+        for i, count in enumerate(counts)
+    ]
 
 
 class PredictionPage(ClosedSchema):
