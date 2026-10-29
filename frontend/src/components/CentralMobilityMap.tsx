@@ -524,7 +524,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                     </span>
                   </h3>
                   <span className="text-[10px] font-bold text-[#8E001C] bg-[#FDF2F4] px-1.5 py-0.5 rounded">
-                    {language === 'it' ? 'Persistito' : 'Persisted'}
+                    {language === 'it' ? 'Dati correnti' : 'Current data'}
                   </span>
                 </div>
                 <p className="text-xs text-[#6B7280] mb-3 leading-relaxed">

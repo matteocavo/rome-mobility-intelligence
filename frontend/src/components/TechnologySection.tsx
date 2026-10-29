@@ -76,8 +76,8 @@ export const TechnologySection: React.FC<TechnologySectionProps> = ({
         </div>
 
         <p className="text-xs text-[#4B5563] mt-3">{language === 'it'
-          ? 'I KPI principali aggregano la popolazione scoring corrente completa; le tabelle mostrano righe limitate e lo storico proviene da Neon. Il rischio ML globale resta non disponibile finché manca un risultato completo. I ritardi in secondi sono osservati, non previsti.'
-          : 'Headline KPIs aggregate the complete current scoring population; tables show bounded rows and history comes from Neon. Global ML risk remains unavailable without a complete result. Delay values in seconds are observed, not predicted.'}</p>
+          ? 'I KPI principali aggregano la popolazione scoring corrente completa; le tabelle mostrano righe limitate e lo storico proviene da Neon. Il rischio ML globale è calcolato sul risultato completo del modello. I ritardi in secondi sono osservati, non previsti.'
+          : 'Headline KPIs aggregate the complete current scoring population; tables show bounded rows and history comes from Neon. Global ML risk is calculated over the complete model result. Delay values in seconds are observed, not predicted.'}</p>
         {/* Distinct Pill Sub-Navigation */}
         <div className="flex border-b border-[#E5E7EB] mt-4 overflow-x-auto gap-2">
           <button
