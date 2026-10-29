@@ -197,6 +197,10 @@ export function App() {
           /* Central Home Interactive Map: Rome Network Canvas on Left + Synchronized Transport Panel on Right */
           <CentralMobilityMap
             predictions={currentPredictions}
+            totalObservations={currentPageInfo.total}
+            hasActiveFilters={Boolean(currentParams.current.route || currentParams.current.stop ||
+              currentParams.current.query || (currentParams.current.risk_class && currentParams.current.risk_class !== 'all') ||
+              (currentParams.current.mode && currentParams.current.mode !== 'all'))}
             selectedLine={selectedLine}
             onSelectLine={handleSelectLine}
             selectedVehicle={selectedVehicle}
