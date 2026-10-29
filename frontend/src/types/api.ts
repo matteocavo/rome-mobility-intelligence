@@ -145,4 +145,11 @@ export interface PageParams {
   mode?: 'all' | 'bus' | 'tram'; from?: string; to?: string;
 }
 export interface CatalogRoute {route_id:string; route_short_name:string; route_long_name:string; route_type:number;}
-export interface PageInfo {source_route_count?:number; total: number; page: number; page_size: 10|20|50; total_pages: number;}
+export interface PageInfo {unknown?:boolean; source_route_count?:number; total: number; page: number; page_size: 10|20|50; total_pages: number;}
+export interface ProbabilityBin {lower:number; upper:number; count:number; percentage:number;}
+export interface HourlyBucket {hour:string; count:number; major_count:number;}
+export interface PredictionAggregate {
+  coverage:'current_scoring_population'|'persisted_prediction_history'; total:number; major_count:number;
+  observed_delay_count:number|null; average_probability:number|null; max_observed_delay_seconds:number|null;
+  probability_bins:ProbabilityBin[]; hourly:HourlyBucket[];
+}

@@ -125,7 +125,7 @@ export const ProbabilityVisualizations: React.FC<ProbabilityVisualizationsProps>
     <section className="mb-6">
       {/* 3-Column Split: Status Breakdown, Critical Lines, Delay Distribution matching reference */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Card 1: Stato delle corse analizzate */}
+        {/* Card 1: Stato dei ritardi osservati */}
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">

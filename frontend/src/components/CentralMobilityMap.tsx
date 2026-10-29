@@ -19,7 +19,7 @@ import { Translations, Language } from '../i18n/translations';
 
 interface CentralMobilityMapProps {
   predictions: CurrentPrediction[];
-  totalObservations: number;
+  totalObservations: number | null;
   hasActiveFilters: boolean;
   selectedLine: string | null;
   onSelectLine: (routeId: string | null) => void;
@@ -335,7 +335,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
               <span className="font-mono text-xs font-bold text-[#8E001C]">
                 {activePredictions.length.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
                 {language === 'it' ? ' osservazioni visualizzate su ' : ' observations shown out of '}
-                {totalObservations.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
+                {totalObservations === null ? t.states.noValue : totalObservations.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
                 {language === 'it'
                   ? hasActiveFilters ? ' risultati' : ' correnti'
                   : hasActiveFilters ? ' results' : ' current'}
@@ -533,7 +533,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                     </span>
                   </h3>
                   <span className="text-[10px] font-bold text-[#8E001C] bg-[#FDF2F4] px-1.5 py-0.5 rounded">
-                    {language === 'it' ? 'Dati correnti' : 'Current data'}
+                    {t.status.liveApi}
                   </span>
                 </div>
                 <p className="text-xs text-[#6B7280] mb-3 leading-relaxed">

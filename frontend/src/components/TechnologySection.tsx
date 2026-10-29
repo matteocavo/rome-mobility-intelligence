@@ -16,12 +16,13 @@ import {
   ArrowRight,
   GitBranch,
 } from 'lucide-react';
-import { CurrentPrediction, ModelInfoResponse } from '../types/api';
+import { ModelInfoResponse, PredictionAggregate } from '../types/api';
 import { Translations, Language } from '../i18n/translations';
 
 interface TechnologySectionProps {
   modelInfo: ModelInfoResponse;
-  predictions: CurrentPrediction[];
+  /** Server-side histogram over the whole current population; null while unavailable. */
+  aggregate: PredictionAggregate | null;
   threshold: number;
   t: Translations;
   language: Language;
@@ -29,24 +30,19 @@ interface TechnologySectionProps {
 
 export const TechnologySection: React.FC<TechnologySectionProps> = ({
   modelInfo,
-  predictions,
+  aggregate,
   threshold,
   t,
   language,
 }) => {
   const [activeTab, setActiveTab] = useState<'model' | 'pipeline' | 'architecture' | 'quality'>('model');
 
-  // Probability distribution histogram for the model tab
-  const probabilityBins = useMemo(() => {
-    const bins = Array(10).fill(0);
-    predictions.forEach((p) => {
-      const idx = Math.min(9, Math.floor(p.major_delay_probability * 10));
-      bins[idx]++;
-    });
-    return bins;
-  }, [predictions]);
-
-  const maxBinCount = Math.max(...probabilityBins, 1);
+  // Probability distribution histogram for the model tab (full current population)
+  const probabilityBins = useMemo(
+    () => (aggregate && aggregate.total > 0 ? aggregate.probability_bins : []),
+    [aggregate],
+  );
+  const maxBinCount = Math.max(...probabilityBins.map((bin) => bin.count), 1);
 
   // Exact validated operational test metrics as specified
   const validatedMetrics = [
@@ -209,7 +205,13 @@ export const TechnologySection: React.FC<TechnologySectionProps> = ({
                   </span>
                 </div>
 
-                {probabilityBins.map((count, idx) => {
+                {probabilityBins.length === 0 && (
+                  <p role="status" className="absolute inset-0 flex items-center justify-center text-xs text-[#6B7280]">
+                    {aggregate ? t.states.noCurrentData : t.states.unavailable}
+                  </p>
+                )}
+                {probabilityBins.map((bin, idx) => {
+                  const count = bin.count;
                   const isOverThreshold = idx >= 3.5;
                   const heightPercent = maxBinCount > 0 ? (count / maxBinCount) * 100 : 0;
                   return (
@@ -219,7 +221,7 @@ export const TechnologySection: React.FC<TechnologySectionProps> = ({
                           isOverThreshold ? 'bg-[#8E001C]' : 'bg-[#FFB300]'
                         }`}
                         style={{ height: `${Math.max(6, heightPercent)}%` }}
-                        title={`Bin ${idx * 10}%–${(idx + 1) * 10}%: ${count} trips`}
+                        title={`${Math.round(bin.lower * 100)}%–${Math.round(bin.upper * 100)}%: ${count} ${language === 'it' ? 'osservazioni' : 'observations'} (${bin.percentage.toFixed(1)}%)`}
                       ></div>
                     </div>
                   );

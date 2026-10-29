@@ -1,6 +1,6 @@
 import {PaginationControls} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { HistoryRecord, PageInfo, PageParams, CatalogRoute } from '../types/api';
+import { HistoryRecord, PageInfo, PageParams, CatalogRoute, PredictionAggregate } from '../types/api';
 import {
   Calendar,
   History as HistoryIcon,
@@ -13,6 +13,7 @@ import { Translations, Language } from '../i18n/translations';
 
 interface HistorySectionProps {
   records: HistoryRecord[];
+  aggregate?: PredictionAggregate | null;
   catalog?:CatalogRoute[];
   pageInfo?: PageInfo; onParametersChange?: (patch:PageParams)=>void; error?:boolean;
   loading: boolean;
@@ -22,7 +23,7 @@ interface HistorySectionProps {
 }
 
 export const HistorySection: React.FC<HistorySectionProps> = ({
-  records, catalog=[],
+  records, aggregate=null, catalog=[],
   pageInfo, onParametersChange, error,
   loading,
   onFilterChange,
@@ -67,25 +68,15 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
     else onFilterChange(selectedRoute === 'all' ? undefined : selectedRoute, flag);
   };
 
-  // Trend summary for mini timeline
-  const timelinePoints = useMemo(() => {
-    const groups = new Map<number, {major: number; total: number}>();
-    for (const record of records) {
-      const timestamp = new Date(record.prediction_generated_at);
-      if (!Number.isFinite(timestamp.getTime())) continue;
-      timestamp.setMinutes(0, 0, 0);
-      const hour = timestamp.getTime();
-      const group = groups.get(hour) ?? {major: 0, total: 0};
-      group.total++; if (record.predicted_major_delay) group.major++;
-      groups.set(hour, group);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => a - b).slice(-6).map(([hour, group]) => ({
-      label: new Date(hour).toLocaleTimeString(language === 'it' ? 'it-IT' : 'en-GB', {hour: '2-digit', minute: '2-digit'}),
-      rate: group.major / group.total * 100, total: group.total,
-    }));
-  }, [records, language]);
-
-
+  // Hourly buckets are aggregated server-side over every record matching the active filters,
+  // so the chart never depends on the rows of the visible page.
+  const timelinePoints = useMemo(() => (aggregate?.hourly ?? [])
+    .filter((bucket) => bucket.count > 0 && Number.isFinite(Date.parse(bucket.hour)))
+    .slice(-6)
+    .map((bucket) => ({
+      label: new Date(bucket.hour).toLocaleTimeString(language === 'it' ? 'it-IT' : 'en-GB', {hour: '2-digit', minute: '2-digit'}),
+      rate: bucket.major_count / bucket.count * 100, total: bucket.count,
+    })), [aggregate, language]);
 
   const debounceTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const pending=useRef<PageParams>({});
@@ -185,7 +176,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                       {pt.rate.toFixed(0)}%
                     </span>
                     <span className="text-[9px] text-[#9CA3AF] block">
-                      {pt.total} {language === 'it' ? 'corse' : 'trips'}
+                      {pt.total} {language === 'it' ? 'osservazioni' : 'observations'}
                     </span>
                   </div>
                 ))}

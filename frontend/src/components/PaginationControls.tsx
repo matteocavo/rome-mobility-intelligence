@@ -1,5 +1,6 @@
 import type { PageInfo, PageParams } from '../types/api';
 export const rangeLabel=(info:PageInfo,language:string)=>{
+  if(info.unknown)return language==='it'?'Osservazioni: —':'Observations: —';
   const start=info.total && info.page<=info.total_pages ? (info.page-1)*info.page_size+1 : 0;
   const end=info.page<=info.total_pages ? Math.min(info.page*info.page_size,info.total) : 0;
   const number=(value:number)=>value.toLocaleString(language==='it'?'it-IT':'en-GB');

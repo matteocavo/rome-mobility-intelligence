@@ -5,7 +5,7 @@ import { Translations, Language } from '../i18n/translations';
 interface HeroOverviewProps {
   sourceWatermark: string;
   sourceAgeSeconds: number;
-  predictionCount: number;
+  predictionCount: number | null;
   majorCount: number | null;
   medianDelaySeconds: number;
   p90DelaySeconds: number;
@@ -55,7 +55,7 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
     : '--:--';
 
   const majorPercentage =
-    majorCount !== null && predictionCount > 0 ? ((majorCount / predictionCount) * 100).toFixed(0) : null;
+    majorCount !== null && predictionCount !== null && predictionCount > 0 ? ((majorCount / predictionCount) * 100).toFixed(0) : null;
 
   return (
     <section id="overview" className="pt-3 pb-1">
@@ -75,7 +75,7 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
 
       {/* 5 Distinct KPI Cards matching reference design */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mt-3">
-        {/* KPI 1: Corse / Mezzi Analizzati */}
+        {/* KPI 1: Osservazioni analizzate */}
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-4 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#4B5563] mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">
@@ -87,7 +87,7 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
           </div>
           <div className="my-1">
             <span className="text-2xl sm:text-3xl font-extrabold font-mono whitespace-nowrap text-[#111827]">
-              {predictionCount}
+              {predictionCount === null ? '—' : predictionCount}
             </span>
             <span className="text-xs text-[#6B7280] font-normal ml-1.5">
               {language === 'it' ? 'osservazioni' : 'observations'}

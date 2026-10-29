@@ -10,11 +10,12 @@ import { HistorySection } from './components/HistorySection';
 import { TechnologySection } from './components/TechnologySection';
 import { AboutSection } from './components/AboutSection';
 import { Footer } from './components/Footer';
+import { UnavailablePanel } from './components/UnavailablePanel';
 
 import {
   CurrentPrediction,
   HistoryRecord,
-  ModelInfoResponse, PageInfo, PageParams, CatalogRoute,
+  ModelInfoResponse, PageInfo, PageParams, CatalogRoute, PredictionAggregate,
 } from './types/api';
 import { api } from './api/client';
 import { DOCUMENTED_MODEL_INFO } from './api/modelInfo';
@@ -41,6 +42,12 @@ export function App() {
   const [sourceAgeSeconds, setSourceAgeSeconds] = useState<number>(NaN);
   const [error, setError] = useState(false);
   const [networkSummary, setNetworkSummary] = useState<any>(null);
+  // Server-side aggregates: network-wide (model histogram), filtered current (line KPIs), filtered history (hourly chart).
+  const [networkAggregate, setNetworkAggregate] = useState<PredictionAggregate | null>(null);
+  const [currentAggregate, setCurrentAggregate] = useState<PredictionAggregate | null>(null);
+  const [currentAggregateLoading, setCurrentAggregateLoading] = useState(true);
+  const [historyAggregate, setHistoryAggregate] = useState<PredictionAggregate | null>(null);
+  const [pageLoaded, setPageLoaded] = useState(false);
   const [threshold, setThreshold] = useState<number>(0.35);
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -49,7 +56,7 @@ export function App() {
   const [isWaking, setIsWaking] = useState<boolean>(false);
   const [wakingMessage, setWakingMessage] = useState<string>('');
 
-  const emptyPage: PageInfo = {total:0,page:1,page_size:20,total_pages:1};
+  const emptyPage: PageInfo = {unknown:true,total:0,page:1,page_size:20,total_pages:1};
   const [currentPageInfo,setCurrentPageInfo]=useState<PageInfo>(emptyPage);
   const [historyPageInfo,setHistoryPageInfo]=useState<PageInfo>(emptyPage);
   const [currentLoading,setCurrentLoading]=useState(true), [historyLoading,setHistoryLoading]=useState(true);
@@ -62,27 +69,39 @@ export function App() {
   const fetchCurrent=useCallback(async(params:PageParams)=>{
     const generation=++currentGeneration.current;
     setCurrentLoading(true);setCurrentError(false);setCurrentPredictions([]);setSelectedVehicle(null);
+    setCurrentAggregate(null);setCurrentAggregateLoading(true);
+    const aggregateRequest=api.getCurrentAggregate(params).then(
+      value=>generation===currentGeneration.current?(setCurrentAggregate(value),value):null,
+      ()=>null,
+    ).finally(()=>{if(generation===currentGeneration.current)setCurrentAggregateLoading(false);});
     try {
       const response=await api.getCurrentPredictions(params.page_size??20,false,undefined,params);
       if(generation!==currentGeneration.current)return;
-      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);
+      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);setPageLoaded(true);
       if(response.data.source_watermark!==networkWatermark.current || response.data.prediction_generated_at!==networkGenerated.current){
         const summary=await api.getSummary();networkWatermark.current=summary.source_watermark;networkGenerated.current=summary.query_generated_at;
         setNetworkSummary(summary);
+        void api.getCurrentAggregate({}).then(setNetworkAggregate,()=>setNetworkAggregate(null));
       }
       if(response.data.threshold)setThreshold(response.data.threshold);
-    } catch {if(generation===currentGeneration.current){setCurrentPredictions([]);setCurrentError(true);}}
+    } catch {if(generation===currentGeneration.current){setCurrentPredictions([]);setCurrentPageInfo(emptyPage);setCurrentError(true);}}
     finally {if(generation===currentGeneration.current)setCurrentLoading(false);}
+    await aggregateRequest;
   },[]);
   const fetchHistory=useCallback(async(params:PageParams)=>{
     const generation=++historyGeneration.current;
-    setHistoryLoading(true);setHistoryError(false);
+    setHistoryLoading(true);setHistoryError(false);setHistoryAggregate(null);
+    const aggregateRequest=api.getHistoryAggregate(params).then(
+      value=>{if(generation===historyGeneration.current)setHistoryAggregate(value);},
+      ()=>{if(generation===historyGeneration.current)setHistoryAggregate(null);},
+    );
     try {
       const response=await api.getHistory(params);
       if(generation!==historyGeneration.current)return;
       setHistoryRecords(response.data.predictions);setHistoryPageInfo(response.pagination);
-    } catch {if(generation===historyGeneration.current){setHistoryRecords([]);setHistoryError(true);}}
+    } catch {if(generation===historyGeneration.current){setHistoryRecords([]);setHistoryPageInfo(emptyPage);setHistoryError(true);}}
     finally {if(generation===historyGeneration.current)setHistoryLoading(false);}
+    await aggregateRequest;
   },[]);
   const changeCurrent=useCallback((patch:PageParams)=>{
     currentParams.current={...currentParams.current,...patch};
@@ -100,8 +119,9 @@ export function App() {
         language==='it' ? `${seconds<30?'Avvio del servizio dati…':'Connessione agli ultimi dati disponibili…'} (${seconds}s)` : `${message} (${seconds}s)`
       ));
       setNetworkSummary(summary);networkWatermark.current=summary.source_watermark;networkGenerated.current=summary.query_generated_at;
+      void api.getCurrentAggregate({}).then(setNetworkAggregate,()=>setNetworkAggregate(null));
       await fetchCurrent(currentParams.current);
-    } catch {setNetworkSummary(null);setError(true);setCurrentPredictions([]);}
+    } catch {setNetworkSummary(null);setNetworkAggregate(null);setError(true);setCurrentPredictions([]);setCurrentAggregateLoading(false);}
     finally {setLoading(false);setIsRefreshing(false);setIsWaking(false);}
     await fetchHistory(historyParams.current);
   },[language,fetchCurrent,fetchHistory]);
@@ -140,15 +160,15 @@ export function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {error && <div role="alert" className="bg-white border border-[#8E001C] rounded-xl p-4">
-          <p>{language === 'it' ? 'Servizio dati non disponibile. Nessun dato dimostrativo viene mostrato.' : 'Data service unavailable. No demo data is shown.'}</p>
+          <p>{t.states.unavailable}. {language === 'it' ? 'Nessun dato dimostrativo viene mostrato.' : 'No demo data is shown.'}</p>
           <button type="button" onClick={() => loadData(true)} className="underline">{language === 'it' ? 'Riprova' : 'Retry'}</button>
         </div>}
-        {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{language === 'it' ? selectedLine ? 'Nessuna osservazione corrente disponibile per questa linea.' : 'Nessuna osservazione corrente disponibile.' : selectedLine ? 'No current observations available for this route.' : 'No current observations available.'}</p>}
+        {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{t.states.noCurrentData}</p>}
         {/* Block A: Overview & 5 KPI Cards */}
-        {!error && networkSummary && <HeroOverview
+        <HeroOverview
           sourceWatermark={networkSummary?.source_watermark ?? ''}
           sourceAgeSeconds={networkSummary?.source_age_seconds ?? NaN}
-          predictionCount={networkSummary?.scored_count ?? 0}
+          predictionCount={networkSummary?.scored_count ?? null}
           majorCount={networkSummary?.major_delay_count ?? null}
           medianDelaySeconds={networkSummary?.median_observed_delay_seconds ?? NaN}
           p90DelaySeconds={networkSummary?.p90_observed_delay_seconds ?? NaN}
@@ -157,17 +177,21 @@ export function App() {
           wakingMessage={wakingMessage}
           t={t}
           language={language}
-        />}
+        />
 
         {/* Primary Analytical Row: Stato delle corse, Linee a rischio, Distribuzione ritardi */}
-        <ProbabilityVisualizations
-          networkSummary={networkSummary}
-          predictions={currentPredictions}
-          threshold={threshold}
-          onSelectLine={handleSelectLine}
-          t={t}
-          language={language}
-        />
+        {networkSummary ? (
+          <ProbabilityVisualizations
+            networkSummary={networkSummary}
+            predictions={currentPredictions}
+            threshold={threshold}
+            onSelectLine={handleSelectLine}
+            t={t}
+            language={language}
+          />
+        ) : (
+          <UnavailablePanel title={t.visualizations.tripStatusTitle} loading={loading} t={t} />
+        )}
 
         {/* Hero Interaction: Find Your Line */}
         <LineSearch
@@ -188,6 +212,8 @@ export function App() {
           <LineDetailView
             routeId={selectedLine}
             predictions={currentPredictions}
+            aggregate={currentAggregate}
+            aggregateLoading={currentAggregateLoading}
             onBack={() => handleSelectLine(null)}
             onInspectVehicle={(veh) => setSelectedVehicle(veh)}
             t={t}
@@ -197,7 +223,7 @@ export function App() {
           /* Central Home Interactive Map: Rome Network Canvas on Left + Synchronized Transport Panel on Right */
           <CentralMobilityMap
             predictions={currentPredictions}
-            totalObservations={currentPageInfo.total}
+            totalObservations={pageLoaded ? currentPageInfo.total : null}
             hasActiveFilters={Boolean(currentParams.current.route || currentParams.current.stop ||
               currentParams.current.query || (currentParams.current.risk_class && currentParams.current.risk_class !== 'all') ||
               (currentParams.current.mode && currentParams.current.mode !== 'all'))}
@@ -231,6 +257,7 @@ export function App() {
         <HistorySection
           catalog={catalog}
           records={historyRecords}
+          aggregate={historyAggregate}
           loading={historyLoading}
           pageInfo={historyPageInfo}
           onParametersChange={changeHistory}
@@ -243,7 +270,7 @@ export function App() {
         {/* Tecnologia / Technical Hub (ML Model, Pipeline, Architecture, Data Quality) */}
         <TechnologySection
           modelInfo={modelInfo}
-          predictions={currentPredictions}
+          aggregate={networkAggregate}
           threshold={threshold}
           t={t}
           language={language}
