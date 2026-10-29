@@ -137,3 +137,30 @@ def test_history_name_search_uses_catalog_ids_as_bound_values():
     compiled = sql.compile(dialect=postgresql.dialect())
     assert "scavi" not in str(compiled) and "011" not in str(compiled)
     assert any(isinstance(value, list) and "011" in value for value in compiled.params.values())
+
+
+def test_population_inference_is_chunked_and_every_row_remains_available():
+    service, model, _ = population(2051)
+    model.predict_proba.side_effect = lambda frame: np.full(len(frame), 0.4)
+    result = service.page(PageQuery(page=103, page_size=20))
+    assert result.total == 2051 and len(result.items) == 11
+    assert service.summary().major_delay_count == 2051
+    assert [len(call.args[0]) for call in model.predict_proba.call_args_list] == [1024, 1024, 3]
+    # Cache rows have no per-record Pydantic dictionaries/fields-set.
+    assert not hasattr(service._snapshot[0][0][0], "__dict__")
+
+
+def test_chunking_preserves_model_probabilities_exactly(bundle, bundle_trust):
+    from app.contracts.operational_ml import FEATURES
+    from app.services.model_service import ModelService
+
+    model = ModelService(bundle, **bundle_trust)
+    frame = synthetic_frame(2051).loc[:, list(FEATURES)]
+    complete = model.predict_proba(frame)
+    chunked = np.concatenate(
+        [
+            model.predict_proba(frame.iloc[start : start + 1024])
+            for start in range(0, len(frame), 1024)
+        ]
+    )
+    np.testing.assert_array_equal(complete, chunked)

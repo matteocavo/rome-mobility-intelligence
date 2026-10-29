@@ -234,7 +234,7 @@ def test_exact_cors_and_no_service_key_preflight():
         assert rejected.status_code == 400
 
 
-def test_public_rate_bucket_is_global_and_separate(public_api):  # noqa: F811
+def test_public_budget_is_per_peer_and_ignores_spoofed_forwarding(public_api):
     sample = public_api[0].app.state.public_population.summary.return_value
     cfg = Settings(
         _env_file=None, environment="test", rate_limit_public=1, n8n_service_api_key=SERVICE_KEY

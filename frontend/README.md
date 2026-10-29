@@ -118,3 +118,9 @@ Il precedente dato 26.744 / 309 rimane solo evidenza del precedente snapshot.
 Lo storico rimane 400 righe / 17 route. Nessun run avviato per questi controlli.
 I filtri temporali dello storico sono disponibili anche in UI, con conversione
 in timestamp ISO timezone-aware prima della richiesta.
+
+
+[Hardening finale PR24](../docs/PR24_HARDENING.md): memoria misurata, quota pubblica
+120/client + ceiling globale 1.200/minuto, budget richieste UI e gate CORS/proxy Render.
+Nessun proxy viene fidato automaticamente; gli esatti CIDR devono essere verificati
+prima del deploy. In locale CORS resta chiuso e si usa il proxy Vite same-origin.

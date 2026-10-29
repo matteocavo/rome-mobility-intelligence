@@ -117,8 +117,9 @@ I dettagli tecnici restano espandibili nella UI.
 Solo GET. POST/PUT/PATCH/DELETE/HEAD ->405. Parametri sconosciuti, duplicati, sort
 arbitrario e input malformato ->422; 429 con Retry-After; 503 indisponibilità/capacità;
 504 deadline SQL/DB. Errori fissi, senza body remoto, URL privati o eccezioni grezze.
-Budget pubblico globale per processo: 30 richieste/60 s, separato dalle route
-operative; configurabile RATE_LIMIT_PUBLIC 1..60. Nessuna fiducia in X-Forwarded-For.
+Budget pubblico per client verificato: 120 richieste/60 s; ceiling globale 1.200/60 s,
+max 1.024 bucket bounded. Le route operative mantengono budget separati invariati.
+Nessuna fiducia in X-Forwarded-For. [Trust proxy, benchmark e gate pre-deploy](PR24_HARDENING.md).
 Il refresh completo è coalesced e bounded; nessun parametro può forzare refresh,
 soglia, modello, tabella, SQL o una scrittura.
 
@@ -234,3 +235,9 @@ Il precedente dato 26.744 / 309 rimane solo evidenza del precedente snapshot.
 Lo storico rimane 400 righe / 17 route. Nessun run avviato per questi controlli.
 I filtri temporali dello storico sono disponibili anche in UI, con conversione
 in timestamp ISO timezone-aware prima della richiesta.
+
+
+L'hardening finale sostituisce la misura storica ~403 MiB con confronti controllati
+prima/dopo sullo stesso snapshot e processo a freddo. Vedere
+[PR 24 hardening](PR24_HARDENING.md): picchi ottimizzati 299,24-309,24 MiB sui due
+snapshot verificati, inferenza chunked e probabilita' esattamente equivalenti.

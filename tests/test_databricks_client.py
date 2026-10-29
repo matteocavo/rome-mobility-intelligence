@@ -91,3 +91,32 @@ def test_connector_error_does_not_expose_secret():
 def test_identifier_injection():
     with pytest.raises(ValueError):
         table_name(configured(), "table; DROP TABLE t")
+
+
+def test_compact_public_fetch_preserves_changed_categories_and_nulls():
+    connection, cursor = MagicMock(), MagicMock()
+    connection.cursor.return_value = cursor
+    cursor.description = [("lineage",), ("value",)]
+    cursor.fetchone.return_value = (configured().databricks_client_id,)
+    cursor.fetchmany.side_effect = [[("A", 1), (None, 2)], [("B", 3)], []]
+    result = DatabricksClient(configured(), lambda **kw: connection).select(
+        "SELECT lineage, value FROM t", max_rows=3, compact_strings=True
+    )
+    assert result.value.tolist() == [1, 2, 3]
+    assert cursor.arraysize == 1000
+    assert result.lineage.iloc[0] == "A" and result.lineage.iloc[2] == "B"
+    assert result.lineage.isna().tolist() == [False, True, False]
+
+
+def test_compaction_never_weakens_original_export_memory_budget():
+    connection, cursor = MagicMock(), MagicMock()
+    connection.cursor.return_value = cursor
+    cursor.description = [("lineage",)]
+    cursor.fetchone.return_value = (configured().databricks_client_id,)
+    cursor.fetchmany.side_effect = [[("X" * 1000,)] * 10, []]
+    with pytest.raises(ExportBudgetError):
+        DatabricksClient(configured(), lambda **kw: connection).select(
+            "SELECT lineage FROM t", max_rows=10, max_bytes=5000, compact_strings=True
+        )
+    cursor.cancel.assert_called()
+    cursor.close.assert_called_once()

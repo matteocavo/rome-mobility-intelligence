@@ -54,6 +54,7 @@ class CurrentScoringRepository:
             {"requested_limit": limit},
             max_rows=limit,
             max_bytes=max_bytes,
+            **({"compact_strings": True} if allow_empty else {}),
         )
         if frame.empty and allow_empty:
             return frame
@@ -81,7 +82,11 @@ class CurrentScoringRepository:
         if (feed > now.timestamp()).any() or (feed < 0).any() or (prepared > now).any():
             raise ValueError("Future or invalid scoring watermark")
         # Validate only the explicit 47-feature projection, never identifiers or targets.
-        for record in frame[list(FEATURES)].to_dict("records"):
-            clean = {k: None if pd.isna(v) else v for k, v in record.items()}
+        # Stream validation: never materialize N x 47 boxed values/dicts at once.
+        for values in frame.loc[:, list(FEATURES)].itertuples(index=False, name=None):
+            clean = {
+                key: None if pd.isna(value) else value
+                for key, value in zip(FEATURES, values, strict=True)
+            }
             PredictRequest.model_validate(clean)
         return frame

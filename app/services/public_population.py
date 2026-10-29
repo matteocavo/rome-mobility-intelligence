@@ -2,6 +2,7 @@
 
 import hashlib
 import time
+from collections import namedtuple
 from datetime import datetime, timezone
 from threading import Lock
 
@@ -12,6 +13,10 @@ from app.contracts.operational_ml import FEATURES
 from app.contracts.public import PublicPrediction, page_response
 from app.data.databricks_client import DataAccessError
 from app.services.public_summary import NetworkSummary, RouteRisk
+
+# Immutable tuple storage has no per-row dict/fields-set. Pydantic validation still
+# covers every source row; only the selected <=50 rows become response models.
+PublicRow = namedtuple("PublicRow", PublicPrediction.model_fields)
 
 
 class PublicPopulation:
@@ -61,9 +66,29 @@ class PublicPopulation:
                 self._snapshot = (self._rows, self._summary, self._expires)
                 return self._snapshot
             # Inference uses only the reviewed, fixed current-source feature contract.
-            values = model.predict_proba(frame.loc[:, list(FEATURES)])
+            values = np.empty(len(frame), dtype=np.float64)
+            for start in range(0, len(frame), 1024):
+                end = min(start + 1024, len(frame))
+                values[start:end] = model.predict_proba(
+                    frame.iloc[start:end].loc[:, list(FEATURES)]
+                )
             if len(values) != len(frame) or not np.isfinite(values).all():
                 raise ValueError("Invalid current population probabilities")
+            # Inference/contract audit are complete; do not retain 47 features and
+            # repeated lineage columns while building the public population.
+            context = [
+                "entity_id",
+                "route_id",
+                "route_type",
+                "stop_id",
+                "stop_sequence",
+                "target_next_stop_id",
+                "trip_id",
+                "vehicle_id",
+                "current_arrival_delay_seconds",
+                "feed_timestamp",
+            ]
+            frame = frame.loc[:, [name for name in context if name in frame.columns]]
             now = datetime.now(timezone.utc)
             watermark = datetime.fromtimestamp(int(frame.feed_timestamp.iloc[0]), timezone.utc)
             result = []
@@ -116,7 +141,12 @@ class PublicPopulation:
                     + " "
                     + route.get("route_long_name", "")
                 )
-                result.append((item, search.casefold()))
+                result.append(
+                    (
+                        PublicRow(*(getattr(item, field) for field in PublicRow._fields)),
+                        search.casefold(),
+                    )
+                )
             delays = pd.to_numeric(frame.current_arrival_delay_seconds, errors="coerce").dropna()
             if not np.isfinite(delays).all() or time.monotonic() - started > 150:
                 raise DataAccessError("Current population budget exceeded")
@@ -171,6 +201,8 @@ class PublicPopulation:
                     critical=int((delays >= 600).sum()),
                 ),
             )
+            # Free features/probabilities before publishing the compact public cache.
+            del frame, values, delays
             self._rows, self._summary = result, summary
             self._expires = time.monotonic() + 300
             self._snapshot = (self._rows, self._summary, self._expires)
@@ -233,7 +265,10 @@ class PublicPopulation:
         return page_response(
             query,
             total=len(selected),
-            items=selected[start : start + query.page_size],
+            items=[
+                PublicPrediction.model_validate(item._asdict())
+                for item in selected[start : start + query.page_size]
+            ],
             coverage="current_scoring_population",
             watermark=summary.source_watermark,
             now=datetime.now(timezone.utc),
