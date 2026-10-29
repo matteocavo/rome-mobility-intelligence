@@ -54,8 +54,9 @@ test('line with fewer observations than a page and line without observations', a
   const some=el(LineDetailView,{routeId:'907',predictions:page.slice(0,3),aggregate:few,aggregateLoading:false,onBack(){},t:translations.en,language:'en'});
   assert.match(some,/3 current observations/);assert.match(some,/3 of 3 observations/);
   const empty={...line907,total:0,major_count:0,observed_delay_count:0,average_probability:null,max_observed_delay_seconds:null,probability_bins:bins(Array(10).fill(0))};
-  const html=el(LineDetailView,{routeId:'ZZZ',predictions:[],aggregate:empty,aggregateLoading:false,onBack(){},t:translations.it,language:'it'});
+  const html=el(LineDetailView,{routeId:'058F',catalogRouteType:3,predictions:[],aggregate:empty,aggregateLoading:false,onBack(){},t:translations.it,language:'it'});
   assert.match(html,/Nessun dato corrente/);
+  assert.match(html,/Autobus/);
   assert.equal(kpi(html,'Rischio medio ritardo:'),'—');
   assert.equal(kpi(html,'Ritardo massimo:'),'—');
   assert.doesNotMatch(html,/Modalità non disponibile|>0 osservazioni correnti/);
@@ -138,8 +139,8 @@ test('model and claim copy matches the audited methodology and the data model', 
     assert.doesNotMatch(text,/massimizza il richiamo|maximize recall|indipendente fuori dal campione|independent out-of-time/);
     assert.doesNotMatch(text,/posizioni in tempo reale|ogni corsa in circolazione|each vehicle in service|live vehicle position|Modalità non disponibile|Mode unavailable|saranno collegati/);
   }
-  assert.equal(translations.it.status.preRelease,'Versione in sviluppo');
-  assert.ok(translations.en.status.preRelease.length>0);
+  assert.equal(translations.it.status.preRelease,'v1.0.0');
+  assert.equal(translations.en.status.preRelease,'v1.0.0');
   assert.equal(translations.it.states.noCurrentData,'Nessun dato corrente');
   assert.equal(translations.en.states.noCurrentData,'No current data');
 });

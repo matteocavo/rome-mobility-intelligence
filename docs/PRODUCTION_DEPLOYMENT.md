@@ -34,24 +34,20 @@ Origin CORS prevista per il backend:
 ```
 
 Un origin è solo schema + host, quindi non include il path GitHub Pages. Non usare `*`.
-Il valore esatto è stato salvato e riletto nella configurazione del servizio Render;
-non è ancora attivo nel processo live perché non è stato avviato un deploy.
+Il valore è attivo sul servizio Render e verificato dalle richieste del sito production.
 
 La PR #24 configura il limite pubblico a 120 richieste per client al minuto, un tetto
 globale di 1.200/minuto per processo e massimo 1.024 bucket; i forwarding header non
 sono fidati per default. Non impostare `PUBLIC_CLIENT_IP_HEADER` o CIDR proxy finché
 Render non documenta/verifica gli esatti CIDR del proxy immediato e non è escluso un
-bypass dell'ingresso pubblico. Non inventare range e non aggirare il limite. Il backend
-Render attualmente live non è stato aggiornato in questa task; i relativi endpoint
-pubblici richiesti hanno restituito 404 nello smoke check.
+bypass dell'ingresso pubblico. Non inventare range e non aggirare il limite. Il backend Render espone gli endpoint pubblici anonimi read-only; le route operative
+restano protette da service authentication.
 
 ## Cold start e accuratezza
 
-Il piano Render Free esistente può sospendere il servizio. Durante il controllo, `/health`
-ha risposto dopo 32,44 s al primo tentativo; le richieste a `/public/routes` e
-`/public/summary` hanno restituito 404. Questo non misura una chiamata riuscita a dati
-reali e non dimostra la latenza del futuro deploy. L'interfaccia attende il backend,
-limita i retry e visualizza errore/ritenta senza passare a dati sintetici.
+Il piano Render Free può sospendere il servizio. Il primo caricamento della popolazione
+completa può essere lento; il frontend mostra loading, retry ed errori senza fallback
+sintetici. Le risposte successive possono usare la cache. Nessuno SLA real-time garantito.
 
 Il catalogo e le geometrie sono derivati da GTFS statico. Non ci sono coordinate live o
 simulate dei mezzi. Evitare promesse di real-time: freschezza e cadenza dipendono dai dati
@@ -68,14 +64,13 @@ Il codice è Apache-2.0. L'artifact reale del modello non è pubblicato. Il prog
 indipendente e non affiliato, approvato o gestito da Roma Capitale, ATAC S.p.A. o altri
 operatori di trasporto.
 
-## Stato di rilascio e azioni residue
+## Stato di rilascio v1.0.0
 
-- Pages source è configurato come GitHub Actions; il deployment avverrà dopo il merge su
-  `main` e il completamento CI. Nessun merge è automatico.
-- Il backend Render risulta ancora sul commit precedente a PR #24. I suoi endpoint
-  pubblici sono 404 e la CORS appena salvata non è stata verificata dopo il salvataggio.
-- Prima del deploy backend occorre verificare in modo documentato i proxy CIDR Render e
-  il percorso d'ingresso, quindi impostare solo CIDR verificati per il client rate limit.
-- Dopo backend deploy: verificare preflight CORS, endpoint pubblici, summary/current/history,
-  route catalog e map; ripetere cold start e browser smoke reale.
-- Questa preparazione non crea tag o release `v1.0.0`.
+Applicazione pubblica live su GitHub Pages, backend Render Free, scoring corrente in
+Databricks e storico PostgreSQL/Neon. Il modello sklearn esegue inference lato server;
+summary e aggregate usano la popolazione completa, le tabelle usano pagination server-side.
+Il catalogo e la geografia GTFS sono statici; le posizioni veicolo non sono esposte.
+
+La release conserva codice Apache-2.0 e artifact modello privato non distribuito.
+La verifica finale copre gli endpoint pubblici e le superfici IT/EN. Il target di costo
+ricorrente è 0 EUR, soggetto ai limiti dei piani Free e a cadenza best-effort.
