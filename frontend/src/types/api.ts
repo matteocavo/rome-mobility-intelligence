@@ -144,4 +144,5 @@ export interface PageParams {
   sort?: 'risk_desc' | 'delay_desc' | 'route_asc' | 'time_desc';
   mode?: 'all' | 'bus' | 'tram'; from?: string; to?: string;
 }
-export interface PageInfo {total: number; page: number; page_size: 10|20|50; total_pages: number;}
+export interface CatalogRoute {route_id:string; route_short_name:string; route_long_name:string; route_type:number;}
+export interface PageInfo {source_route_count?:number; total: number; page: number; page_size: 10|20|50; total_pages: number;}

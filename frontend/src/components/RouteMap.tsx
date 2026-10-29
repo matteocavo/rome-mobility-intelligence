@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import L from 'leaflet';
+import {api} from '../api/client';
 import 'leaflet/dist/leaflet.css';
 import { CurrentPrediction } from '../types/api';
 import { stopDetails, escapeHtml } from '../api/geography';
@@ -28,6 +29,14 @@ export const RouteMap: React.FC<RouteMapProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const polylineLayerRef = useRef<L.Polyline | null>(null);
   const vehicleMarkersMapRef = useRef<Map<string, L.Marker>>(new Map());
+
+  const [geometry,setGeometry]=useState<[number,number][]>([]);
+  const trip=vehicles.find(v=>v.vehicle_id===selectedVehicleId)?.trip_id ?? vehicles[0]?.trip_id;
+  useEffect(()=>{
+    let active=true;setGeometry([]);
+    if(trip)void api.getRouteMap(routeId,trip).then(points=>{if(active)setGeometry(points);}).catch(()=>{if(active)setGeometry([]);});
+    return ()=>{active=false;};
+  },[routeId,trip]);
 
   // Extract stops that belong to this route with verified coordinates from the dataset
   const stopsWithCoords = useMemo(() => {
@@ -161,7 +170,11 @@ export const RouteMap: React.FC<RouteMapProps> = ({
     const routeColor = isTram ? '#00703C' : '#8E001C';
     const boundsPoints: [number, number][] = [];
 
-    // No shapes are available: never invent route geometry.
+    // Only the exact static route/trip/shape join is drawable; never connect observed stops.
+    if(geometry.length>1){
+      polylineLayerRef.current=L.polyline(geometry,{color:routeColor,weight:4,opacity:.7}).addTo(map);
+      boundsPoints.push(...geometry);
+    }
     // 2. Render verified stop markers
     stopsWithCoords.forEach((stop) => {
       boundsPoints.push([stop.lat, stop.lon]);
@@ -242,125 +255,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
       markersGroup.addLayer(stopMarker);
     });
 
-    // 3. Render verified vehicle markers
-    vehicles.forEach((veh, idx) => {
-      const stopInfo = stopDetails(veh);
-      if (!stopInfo) return;
-
-      if (!Number.isFinite(veh.vehicle_lat) || !Number.isFinite(veh.vehicle_lon)) return;
-      const offsetLat = veh.vehicle_lat!;
-      const offsetLon = veh.vehicle_lon!;
-      boundsPoints.push([offsetLat, offsetLon]);
-
-      const isSelected = selectedVehicleId === veh.vehicle_id;
-      const isHighRisk =
-        veh.major_delay_probability >= 0.35;
-      const isModerate =
-        !isHighRisk &&
-        (veh.major_delay_probability >= 0.2 || (veh.current_arrival_delay_seconds || 0) >= 120);
-
-      const statusColor = isHighRisk ? '#8E001C' : isModerate ? '#FFB300' : '#10B981';
-
-      const vehicleHtml = `
-        <div style="
-          background: ${isSelected ? '#8E001C' : '#111827'};
-          color: #FFFFFF;
-          padding: 3px 8px;
-          border-radius: 6px;
-          border: 2px solid ${isSelected ? '#FFB300' : statusColor};
-          box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-          font-size: 11px;
-          font-weight: 800;
-          font-family: monospace;
-          white-space: nowrap;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          transform: ${isSelected ? 'scale(1.18)' : 'scale(1)'};
-          transition: transform 0.15s ease;
-          cursor: pointer;
-        ">
-          <span style="
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: ${statusColor};
-            box-shadow: 0 0 5px ${statusColor};
-          "></span>
-          <span>${escapeHtml(veh.vehicle_id || 'ATAC')}</span>
-        </div>
-      `;
-
-      const vehicleIcon = L.divIcon({
-        className: 'custom-vehicle-marker',
-        html: vehicleHtml,
-        iconSize: [56, 26],
-        iconAnchor: [28, 13],
-      });
-
-      const vehMarker = L.marker([offsetLat, offsetLon], { icon: vehicleIcon });
-
-      vehMarker.bindPopup(`
-        <div style="font-family: inherit; min-width: 200px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-            <span style="font-weight: 900; font-size: 13px; color: #111827; font-family: monospace;">
-              ${escapeHtml(veh.vehicle_id || 'ATAC')}
-            </span>
-            <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: ${
-              isHighRisk ? '#FDF2F4' : '#ECFDF5'
-            }; color: ${isHighRisk ? '#8E001C' : '#065F46'}; border: 1px solid ${
-        isHighRisk ? '#F1C3CA' : '#A7F3D0'
-      };">
-              ${isHighRisk ? (language === 'it' ? 'Rischio elevato' : 'High delay risk') : (language === 'it' ? 'Regolare' : 'Nominal')}
-            </span>
-          </div>
-
-          <div style="font-size: 11px; margin-top: 6px; color: #374151;">
-            ${language === 'it' ? 'Prossima fermata:' : 'Next stop:'} <strong>${escapeHtml(stopInfo.name)}</strong>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #E5E7EB;">
-            <div>
-              <span style="font-size: 10px; color: #6B7280; display: block;">
-                ${language === 'it' ? 'Ritardo osservato:' : 'Observed delay:'}
-              </span>
-              <strong style="font-size: 13px; font-family: monospace; color: ${
-                isHighRisk ? '#8E001C' : '#111827'
-              };">
-                ${formatDelay(veh.current_arrival_delay_seconds)}
-              </strong>
-            </div>
-
-            <div>
-              <span style="font-size: 10px; color: #6B7280; display: block;">
-                ${language === 'it' ? 'Prob. ritardo ≥5m:' : 'Major risk:'}
-              </span>
-              <strong style="font-size: 13px; font-family: monospace; color: #111827;">
-                ${(veh.major_delay_probability * 100).toFixed(1)}%
-              </strong>
-            </div>
-          </div>
-
-          ${
-            veh.vehicle_speed !== undefined
-              ? `<div style="font-size: 10px; color: #6B7280; margin-top: 6px;">
-                  ${language === 'it' ? 'Velocità:' : 'Speed:'} <strong>${escapeHtml(veh.vehicle_speed.toFixed(1))} km/h</strong> •
-                  ${language === 'it' ? 'Distanza residua:' : 'Distance:'} <strong>${escapeHtml(veh.distance_to_next_stop_meters)}m</strong>
-                </div>`
-              : ''
-          }
-        </div>
-      `);
-
-      vehMarker.on('click', () => {
-        if (onSelectVehicle) onSelectVehicle(veh);
-      });
-
-      markersGroup.addLayer(vehMarker);
-      if (veh.vehicle_id) {
-        vehicleMarkersMapRef.current.set(veh.vehicle_id, vehMarker);
-      }
-    });
+    // Vehicle positions are unavailable to this identity. No vehicle markers are created.
 
     // Auto-fit bounds to include all stops and vehicles
     if (boundsPoints.length > 0) {
@@ -372,7 +267,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
     setTimeout(() => {
       if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
     }, 100);
-  }, [hasCoordinates, stopsWithCoords, vehicles, routeId, selectedVehicleId, language, onSelectVehicle]);
+  }, [hasCoordinates, stopsWithCoords, vehicles, routeId, selectedVehicleId, language, onSelectVehicle,geometry]);
 
   // Center on selected vehicle if clicked from sidebar
   useEffect(() => {
@@ -442,9 +337,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
           </span>
         </span>
         <span className="text-[#9CA3AF]">
-          {language === 'it'
-            ? 'Shapes non disponibili: nessun percorso disegnato'
-            : 'Shapes unavailable: no route path drawn'}
+          {geometry.length ? language==='it'?'Geometria GTFS statica della corsa selezionata':'Static GTFS geometry for the selected trip' : language==='it'?'Shape non abbinata: solo fermate reali':'No matching shape: real stops only'}
         </span>
       </div>
 

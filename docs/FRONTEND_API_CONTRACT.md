@@ -9,6 +9,8 @@ Never place RMI_SERVICE_API_KEY or any backend secret in browser code.
 
 | Endpoint | Metodo/auth | Fonte e responsabilità |
 | --- | --- | --- |
+| `/public/routes` | GET anonimo | catalogo GTFS completo e checksum, senza query runtime |
+| `/public/route-map` | GET anonimo | geometria statica per join esatto route/trip, al massimo 5.000 punti |
 | `/public/status` | GET anonimo | stesso snapshot completo/cached di summary |
 | `/public/summary` | GET anonimo | aggregati della popolazione scoring corrente completa |
 | `/public/predictions/current` | GET anonimo | pagina ordinata/filtrata della stessa popolazione corrente |
@@ -181,3 +183,54 @@ Current page 2: **20 items**, total=26.744, total_pages=1.338. Ricerca substring
 `557`: **257** risultati globali prima della pagina. History page 2: **20 items**,
 total=400, total_pages=20. I numeri precedenti sono prove datate, non costanti del
 codice: i totali si aggiornano con la sorgente e i KPI non derivano dalla pagina.
+
+
+### Catalogo linee GTFS e copertura distinta
+
+`GET /public/routes` espone il catalogo statico completo, indipendente da Databricks,
+Neon e dalle pagine visualizzate. Il catalogo normalizzato contiene 435 route e solo
+`route_id`, `route_short_name`, `route_long_name`, `route_type`, con provenienza e SHA256.
+Source of truth: core `data/reference/gtfs_static/routes.txt`;
+SHA256 `19ac1d2f24a096f47f9921809f7c645e57aa2027edce4592d458ee4d4c8319a6`.
+La data di acquisizione del file non e' documentata: il catalogo e' la copia verificata
+versionata nel core, non una dichiarazione di copertura di tutte le linee oggi esistenti.
+
+Entrambi i selettori usano tutte le 435 route, senza dedurle dalle osservazioni.
+La ricerca supporta ID, nome breve e nome esteso; il backend estende le ricerche
+sulle osservazioni con il lookup del catalogo. Le linee senza osservazioni rimangono
+selezionabili e producono uno stato vuoto, senza simulare dati.
+
+I conteggi sono distinti: catalogo GTFS (435), linee nel current scoring (309 nel
+controllo del 29 ottobre 2026, watermark 07:47:49 UTC), linee nello storico Neon
+(17 nel controllo dello stesso giorno, 400 righe persistite). `source_route_count`
+nelle pagine indica il COUNT DISTINCT della sorgente intera, indipendente da ricerca,
+filtri e paginazione. I KPI correnti continuano a provenire dal summary completo.
+Il catalogo completo non contiene osservazioni: scaricarlo non scarica la popolazione
+scoring o la tabella history. Il limite di risposta e i GET allowlisted restano attivi.
+
+
+### Geometria GTFS verificata
+
+Audit relazionale: 166.161 trips, 1.248 shape_id, 5.027.858 stop_times;
+zero riferimenti mancanti a trip o stop, tutte le shape dei trips presenti.
+Il manifest `app/data/reference/gtfs_manifest.json` contiene i checksum di tutti
+cinque i file. Gli indici statici per route sono generati da
+`scripts/build_public_gtfs_maps.py`, senza credenziali o query runtime.
+`GET /public/route-map?route=...&trip=...` risolve solo un abbinamento esatto
+route/trip/shape e restituisce punti originali ordinati per shape_pt_sequence,
+mai un percorso costruito collegando le osservazioni. File scelto con SHA256
+dell'ID dal catalogo, nessun path controllabile dal client. Lookup locale bounded,
+max 5.000 punti in risposta; join assente = available:false, coordinates:[].
+Il dettaglio mostra la geometria della corsa selezionata o della prima osservazione
+visualizzata, esplicitamente statica. Non equivale al percorso operativo attuale.
+Le posizioni veicolo non sono disponibili e non vengono disegnate. L'overview
+mostra le fermate reali della pagina, senza inventare geometrie di rete.
+
+
+Ultima riconferma runtime del 29 ottobre 2026, query_generated_at 12:03:15 UTC:
+23.678 osservazioni correnti, 314 route, watermark 09:46:31 UTC, 5.176 rischi
+major (21,85995%), mediana osservata -42 s e P90 osservato 692 s.
+Il precedente dato 26.744 / 309 rimane solo evidenza del precedente snapshot.
+Lo storico rimane 400 righe / 17 route. Nessun run avviato per questi controlli.
+I filtri temporali dello storico sono disponibili anche in UI, con conversione
+in timestamp ISO timezone-aware prima della richiesta.

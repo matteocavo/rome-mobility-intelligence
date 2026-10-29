@@ -1,6 +1,6 @@
 import {PaginationControls, rangeLabel} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { CurrentPrediction, PageInfo, PageParams } from '../types/api';
+import { CurrentPrediction, PageInfo, PageParams, CatalogRoute } from '../types/api';
 import {
   Search,
   Filter,
@@ -13,17 +13,18 @@ import { Translations, Language } from '../i18n/translations';
 
 interface LivePredictionsProps {
   predictions: CurrentPrediction[];
+  catalog?:CatalogRoute[];
   pageInfo?: PageInfo; onParametersChange?: (patch:PageParams)=>void; error?:boolean;
   loading: boolean;
   threshold: number;
-  onSelectLine: (routeId: string) => void;
+  onSelectLine: (routeId: string|null) => void;
   selectedLine: string | null;
   t: Translations;
   language: Language;
 }
 
 export const LivePredictions: React.FC<LivePredictionsProps> = ({
-  predictions,
+  predictions,catalog=[],
   pageInfo, onParametersChange, error,
   loading,
   threshold,
@@ -223,6 +224,10 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
           <div className="mt-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
+              <select aria-label={language==='it'?'Filtra situazione attuale per linea':'Filter current observations by route'} value={selectedLine??''} onChange={event=>onSelectLine(event.target.value||null)} className="border border-[#E5E7EB] rounded px-2 py-1 text-xs max-w-64">
+                <option value="">{language==='it'?'Tutte le linee':'All routes'}</option>
+                {catalog.map(r=><option key={r.route_id} value={r.route_id}>{r.route_short_name||r.route_id}{r.route_long_name?' - '+r.route_long_name:''}</option>)}
+              </select>
               <input
                 aria-label={language === 'it' ? 'Cerca nelle osservazioni' : 'Search observations'}
                 type="text"
@@ -311,7 +316,7 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
               ) : filteredPredictions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-[#6B7280]">
-                    {t.currentSituation.noVehiclesFound}
+                    {selectedLine ? language==='it'?'Nessuna osservazione corrente disponibile per questa linea.':'No current observations available for this route.' : t.currentSituation.noVehiclesFound}
                   </td>
                 </tr>
               ) : (
@@ -451,7 +456,7 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
             </div>
           ) : filteredPredictions.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#6B7280]">
-              {t.currentSituation.noVehiclesFound}
+              {selectedLine ? language==='it'?'Nessuna osservazione corrente disponibile per questa linea.':'No current observations available for this route.' : t.currentSituation.noVehiclesFound}
             </div>
           ) : (
             filteredPredictions.map((pred, i) => {

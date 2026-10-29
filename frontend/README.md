@@ -62,11 +62,12 @@ resize/map. Tile HTTPS © OpenStreetMap contributors, attribuzione visibile,
 nessun prefetch offline. Fermate da GTFS statico del core con checksum documentato;
 non è un GTFS aggiornato in tempo reale e non viene inventata la data di acquisizione.
 
-Il backend restituisce coordinate reali delle fermate e route_type reale dove
-presente. Mai inferenze Bus/Tram da numeri di linea. Le coordinate veicolo e le
-shapes non sono disponibili nella proiezione autorizzata: null/avviso, nessun jitter,
-nessuna polyline fittizia. Route short/long name non disponibile: ID vero, non nomi
-inventati. [Contratto e prove](../docs/FRONTEND_API_CONTRACT.md).
+Il backend restituisce coordinate reali delle fermate e route_type dal catalogo
+verificato, dove abbinato. Nessuna deduzione da numeri di linea. Nessuna posizione
+veicolo. Il dettaglio linea mostra una shape statica solo per il join esatto
+route_id/trip_id/shape_id; se non abbinata, solo fermate reali. Nessun jitter o
+percorso interpolato. I nomi sono quelli presenti nel catalogo, senza inventare
+nomi mancanti. [Contratto e prove](../docs/FRONTEND_API_CONTRACT.md).
 
 ## Deploy e capacità
 
@@ -84,3 +85,36 @@ non corretta attivando/modificando scheduler in questa task.
 
 Codice Apache License 2.0; modello privato non distribuito.
 [Attribuzioni](THIRD_PARTY_NOTICES.md).
+
+
+### Catalogo linee GTFS e copertura distinta
+
+`GET /public/routes` espone il catalogo statico completo, indipendente da Databricks,
+Neon e dalle pagine visualizzate. Il catalogo normalizzato contiene 435 route e solo
+`route_id`, `route_short_name`, `route_long_name`, `route_type`, con provenienza e SHA256.
+Source of truth: core `data/reference/gtfs_static/routes.txt`;
+SHA256 `19ac1d2f24a096f47f9921809f7c645e57aa2027edce4592d458ee4d4c8319a6`.
+La data di acquisizione del file non e' documentata: il catalogo e' la copia verificata
+versionata nel core, non una dichiarazione di copertura di tutte le linee oggi esistenti.
+
+Entrambi i selettori usano tutte le 435 route, senza dedurle dalle osservazioni.
+La ricerca supporta ID, nome breve e nome esteso; il backend estende le ricerche
+sulle osservazioni con il lookup del catalogo. Le linee senza osservazioni rimangono
+selezionabili e producono uno stato vuoto, senza simulare dati.
+
+I conteggi sono distinti: catalogo GTFS (435), linee nel current scoring (309 nel
+controllo del 29 ottobre 2026, watermark 07:47:49 UTC), linee nello storico Neon
+(17 nel controllo dello stesso giorno, 400 righe persistite). `source_route_count`
+nelle pagine indica il COUNT DISTINCT della sorgente intera, indipendente da ricerca,
+filtri e paginazione. I KPI correnti continuano a provenire dal summary completo.
+Il catalogo completo non contiene osservazioni: scaricarlo non scarica la popolazione
+scoring o la tabella history. Il limite di risposta e i GET allowlisted restano attivi.
+
+
+Ultima riconferma runtime del 29 ottobre 2026, query_generated_at 12:03:15 UTC:
+23.678 osservazioni correnti, 314 route, watermark 09:46:31 UTC, 5.176 rischi
+major (21,85995%), mediana osservata -42 s e P90 osservato 692 s.
+Il precedente dato 26.744 / 309 rimane solo evidenza del precedente snapshot.
+Lo storico rimane 400 righe / 17 route. Nessun run avviato per questi controlli.
+I filtri temporali dello storico sono disponibili anche in UI, con conversione
+in timestamp ISO timezone-aware prima della richiesta.

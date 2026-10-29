@@ -70,9 +70,12 @@ class PredictionPage(ClosedSchema):
     query_generated_at: datetime
     items: list[PublicPrediction]
     population_generated_at: datetime | None = None
+    source_route_count: int | None = Field(default=None, ge=0)
 
 
-def page_response(query, *, total, items, coverage, watermark, now, generated=None):
+def page_response(
+    query, *, total, items, coverage, watermark, now, generated=None, source_route_count=None
+):
     return PredictionPage(
         coverage=coverage,
         total=total,
@@ -84,4 +87,33 @@ def page_response(query, *, total, items, coverage, watermark, now, generated=No
         query_generated_at=now,
         items=items,
         population_generated_at=generated,
+        source_route_count=source_route_count,
     )
+
+
+class CatalogRoute(ClosedSchema):
+    route_id: str
+    route_short_name: str
+    route_long_name: str
+    route_type: int
+
+
+class RouteCatalog(ClosedSchema):
+    source: str
+    sha256: str
+    total: int
+    items: list[CatalogRoute]
+
+
+class RouteMapQuery(ClosedSchema):
+    route: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    trip: str = Field(min_length=1, max_length=512, pattern=r"^[^\x00-\x1f\x7f]*$")
+
+
+class RouteGeometry(ClosedSchema):
+    source: Literal["verified_static_gtfs"] = "verified_static_gtfs"
+    route_id: str
+    trip_id: str
+    shape_id: str | None = None
+    coordinates: list[tuple[float, float]] = Field(default_factory=list, max_length=5000)
+    available: bool

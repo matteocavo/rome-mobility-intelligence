@@ -14,7 +14,7 @@ import { Footer } from './components/Footer';
 import {
   CurrentPrediction,
   HistoryRecord,
-  ModelInfoResponse, PageInfo, PageParams,
+  ModelInfoResponse, PageInfo, PageParams, CatalogRoute,
 } from './types/api';
 import { api } from './api/client';
 import { DOCUMENTED_MODEL_INFO } from './api/modelInfo';
@@ -25,6 +25,9 @@ export function App() {
   const t = translations[language];
 
   const [activeSection, setActiveSection] = useState<string>('overview');
+  const [catalog,setCatalog]=useState<CatalogRoute[]>([]);
+  const [catalogError,setCatalogError]=useState(false);
+  useEffect(()=>{void api.getRoutes().then(setCatalog).catch(()=>setCatalogError(true));},[]);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<CurrentPrediction | null>(null);
   const [modeFilter, setModeFilter] = useState<'all' | 'bus' | 'tram'>('all');
@@ -111,7 +114,7 @@ export function App() {
   const searchCurrent=useCallback((value:string)=>{setSelectedLine(null);changeCurrent({query:value,route:undefined,page:1});},[changeCurrent]);
   const handleSelectLine=(routeId:string|null)=>{
     setSelectedLine(routeId);setSelectedVehicle(null);
-    changeCurrent({route:routeId??undefined,page:1});
+    changeCurrent({route:routeId??undefined,query:undefined,page:1});
   };
   const handleHistoryFilterChange=(route?:string,majorOnly?:boolean)=>{
     changeHistory({route,risk_class:majorOnly?'major':'all',page:1});
@@ -140,7 +143,7 @@ export function App() {
           <p>{language === 'it' ? 'Servizio dati non disponibile. Nessun dato dimostrativo viene mostrato.' : 'Data service unavailable. No demo data is shown.'}</p>
           <button type="button" onClick={() => loadData(true)} className="underline">{language === 'it' ? 'Riprova' : 'Retry'}</button>
         </div>}
-        {!loading && !error && currentPredictions.length === 0 && <p role="status">{language === 'it' ? 'Nessuna predizione disponibile.' : 'No predictions available.'}</p>}
+        {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{language === 'it' ? selectedLine ? 'Nessuna osservazione corrente disponibile per questa linea.' : 'Nessuna osservazione corrente disponibile.' : selectedLine ? 'No current observations available for this route.' : 'No current observations available.'}</p>}
         {/* Block A: Overview & 5 KPI Cards */}
         {!error && networkSummary && <HeroOverview
           sourceWatermark={networkSummary?.source_watermark ?? ''}
@@ -168,6 +171,10 @@ export function App() {
 
         {/* Hero Interaction: Find Your Line */}
         <LineSearch
+          catalog={catalog}
+          catalogError={catalogError}
+          currentRouteCount={networkSummary?.route_count}
+          historyRouteCount={historyPageInfo.source_route_count}
           predictions={currentPredictions}
           onSelectLine={handleSelectLine}
           selectedLine={selectedLine}
@@ -206,6 +213,7 @@ export function App() {
 
         {/* Situazione Attuale / Current Situation (Structured Table & Cards) */}
         <LivePredictions
+          catalog={catalog}
           predictions={currentPredictions}
           loading={currentLoading}
           pageInfo={currentPageInfo}
@@ -220,6 +228,7 @@ export function App() {
 
         {/* Storico / Observation History */}
         <HistorySection
+          catalog={catalog}
           records={historyRecords}
           loading={historyLoading}
           pageInfo={historyPageInfo}

@@ -309,8 +309,8 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
   return (
     <div className="mb-8">
       <p role="note" className="text-xs text-[#4B5563] mb-2">{language === 'it'
-        ? 'Coordinate delle fermate da GTFS statico. Posizioni veicolo e shapes non disponibili; nessuna posizione o geometria simulata.'
-        : 'Stop coordinates from static GTFS. Vehicle positions and shapes unavailable; no simulated positions or geometry.'}</p>
+        ? 'Fermate reali da GTFS statico. Geometria della corsa nel dettaglio linea, se abbinata. Posizioni veicolo non disponibili.'
+        : 'Real static GTFS stops. Trip geometry in route details where matched. Vehicle positions unavailable.'}</p>
       {/* Home Split Canvas: Large Map on Left + Synchronized Transport Panel on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* LEFT: Central Leaflet Map (7 or 8 columns on large screens) */}
@@ -627,27 +627,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
             </div>
           )}
 
-          {/* Quick Line Search / Switcher integrated in the sidebar */}
-          <div className="bg-[#F8F9FA] rounded-xl border border-[#E5E7EB] p-3 text-xs flex items-center justify-between">
-            <span className="text-[#6B7280] font-medium">
-              {language === 'it' ? 'Linee nei dati correnti:' : 'Routes in current data:'}
-            </span>
-            <div className="flex flex-wrap items-center gap-1">
-              {Array.from(new Set(predictions.map(p => p.route_id).filter((route): route is string => Boolean(route)))).slice(0, 7).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onSelectLine(selectedLine === r ? null : r)}
-                  className={`px-1.5 py-0.5 rounded font-mono font-bold text-[11px] transition-all cursor-pointer ${
-                    selectedLine === r
-                      ? 'bg-[#8E001C] text-white shadow-xs'
-                      : 'bg-white border border-[#E5E7EB] text-[#374151] hover:border-[#8E001C]'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

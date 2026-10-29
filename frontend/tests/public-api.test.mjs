@@ -92,7 +92,7 @@ test('production graph contains neither fixture imports nor private paths/hardco
   assert.doesNotMatch(apiCode,/mockData|demoData|RMI_SERVICE_API_KEY|\/model\/info|\/predictions\/current\/persist/);
   for (const file of ['CentralMobilityMap','RouteMap','LineSearch']) {
     const source=readFileSync(`src/components/${file}.tsx`,'utf8');
-    assert.doesNotMatch(source,/DEMO_STOP|KNOWN_STOP|mockData|jitter|L\.polyline\(/);
+    assert.doesNotMatch(source,/DEMO_STOP|KNOWN_STOP|mockData|jitter/);
   }
 });
 test('IT/EN remain structurally complete and factual', async () => {
@@ -135,4 +135,26 @@ test('pagination controls use server total, not the number of displayed items', 
     const source=readFileSync(`src/components/${file}.tsx`,'utf8');
     assert.match(source,/onParametersChange/);assert.match(source,/350/);assert.match(source,/PaginationControls/);
   }
+});
+
+
+test('route selectors use the complete GTFS catalog independently of displayed records', async()=>{
+  const React=await import('react');
+  const {renderToStaticMarkup}=await import('react-dom/server');
+  const {LineSearch}=await import(pathToFileURL(join(temporary,'components/LineSearch.js')));
+  const {HistorySection}=await import(pathToFileURL(join(temporary,'components/HistorySection.js')));
+  const {translations}=await import(pathToFileURL(join(temporary,'i18n/translations.js')));
+  const catalog=[{route_id:'UNOBSERVED',route_short_name:'CAT',route_long_name:'Catalog only route',route_type:3}];
+  const common={catalog,t:translations.it,language:'it'};
+  const hero=renderToStaticMarkup(React.createElement(LineSearch,{...common,predictions:[],selectedLine:null,onSelectLine:()=>{}}));
+  const history=renderToStaticMarkup(React.createElement(HistorySection,{...common,records:[],loading:false,onFilterChange:()=>{}}));
+  for(const html of [hero,history]){assert.match(html,/UNOBSERVED/);assert.match(html,/Catalog only route/);assert.doesNotMatch(html,/Tutte le linee \(1\)/);}
+});
+
+
+test('route geometry uses only a verified static join and creates no vehicle markers',()=>{
+  const code=readFileSync('src/components/RouteMap.tsx','utf8');
+  assert.match(code,/api.getRouteMap\(routeId,trip\)/);
+  assert.match(code,/L\.polyline\(geometry/);
+  assert.doesNotMatch(code,/L\.polyline\(stops|const vehMarker|offsetLat|offsetLon/);
 });

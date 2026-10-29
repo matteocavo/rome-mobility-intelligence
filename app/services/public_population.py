@@ -74,7 +74,8 @@ class PublicPopulation:
                 probability = float(values[index])
                 observed = row["current_arrival_delay_seconds"]
                 observed = None if pd.isna(observed) else float(observed)
-                route_type = row.get("route_type")
+                route = getattr(self.geography, "routes", {}).get(str(row.get("route_id")), {})
+                route_type = route.get("route_type", row.get("route_type"))
                 route_type = None if pd.isna(route_type) else int(route_type)
                 grain = (row["entity_id"], row["trip_id"], row["stop_sequence"], row["stop_id"])
                 item = PublicPrediction(
@@ -92,6 +93,7 @@ class PublicPopulation:
                     trip_id=str(row["trip_id"]),
                     vehicle_id=str(row["vehicle_id"]) if pd.notna(row.get("vehicle_id")) else None,
                     route_type=route_type,
+                    route_short_name=route.get("route_short_name"),
                     stop_name=stop.get("name"),
                     stop_lat=stop.get("lat"),
                     stop_lon=stop.get("lon"),
@@ -109,6 +111,10 @@ class PublicPopulation:
                     )
                     + " "
                     + stop.get("name", "")
+                    + " "
+                    + route.get("route_short_name", "")
+                    + " "
+                    + route.get("route_long_name", "")
                 )
                 result.append((item, search.casefold()))
             delays = pd.to_numeric(frame.current_arrival_delay_seconds, errors="coerce").dropna()
@@ -232,4 +238,5 @@ class PublicPopulation:
             watermark=summary.source_watermark,
             now=datetime.now(timezone.utc),
             generated=summary.query_generated_at,
+            source_route_count=summary.route_count,
         )

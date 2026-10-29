@@ -101,3 +101,39 @@ def test_empty_population_is_honest_and_never_runs_inference():
     assert result.total == 0 and result.items == []
     assert service.summary().scored_count == 0 and service.summary().major_delay_rate is None
     model.predict_proba.assert_not_called()
+
+
+def test_catalog_names_are_searchable_globally_and_routes_without_data_remain_empty():
+    service, _, _ = population()
+    service.geography.routes = {
+        "557": {
+            "route_short_name": "SHORT",
+            "route_long_name": "Catalog terminus",
+            "route_type": 3,
+        },
+        "UNOBSERVED": {
+            "route_short_name": "EMPTY",
+            "route_long_name": "No observations",
+            "route_type": 0,
+        },
+    }
+    result = service.page(PageQuery(query="catalog terminus", page_size=10))
+    assert result.total == 50 and result.source_route_count == 2
+    assert result.items[0].route_short_name == "SHORT"
+    empty = service.page(PageQuery(route="UNOBSERVED"))
+    assert empty.total == 0 and empty.items == []
+    assert "UNOBSERVED" in service.geography.routes
+
+
+def test_history_name_search_uses_catalog_ids_as_bound_values():
+    from sqlalchemy import select
+
+    from app.data.public_geography import PublicGeography
+    from app.persistence.models import prediction_history
+
+    sql = select(prediction_history.c.id).where(
+        *filtered(PageQuery(query="scavi ostia antica"), PublicGeography())
+    )
+    compiled = sql.compile(dialect=postgresql.dialect())
+    assert "scavi" not in str(compiled) and "011" not in str(compiled)
+    assert any(isinstance(value, list) and "011" in value for value in compiled.params.values())

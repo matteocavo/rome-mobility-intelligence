@@ -5,7 +5,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 
-from app.contracts.public import PageQuery, PredictionPage
+from app.contracts.public import (
+    PageQuery,
+    PredictionPage,
+    RouteCatalog,
+    RouteGeometry,
+    RouteMapQuery,
+)
 from app.data.databricks_client import QueryTimeoutError
 from app.persistence.database import DatabaseTimeout
 from app.services.public_summary import NetworkSummary
@@ -70,3 +76,22 @@ def page_read(request, kind, query):
         raise HTTPException(422, "Public query or source contract is invalid") from None
     except Exception:
         raise HTTPException(503, "Public data temporarily unavailable") from None
+
+
+@router.get("/routes", response_model=RouteCatalog, dependencies=[Depends(no_parameters)])
+def routes(request: Request):
+    return request.app.state.public_history.geography.catalog
+
+
+@router.get("/route-map", response_model=RouteGeometry)
+def route_map(request: Request):
+    if any(len(request.query_params.getlist(key)) != 1 for key in request.query_params):
+        raise HTTPException(422, "Duplicate query parameters are not supported")
+    try:
+        query = RouteMapQuery.model_validate(dict(request.query_params))
+    except ValidationError:
+        raise HTTPException(422, "Public map query schema is invalid") from None
+    try:
+        return request.app.state.public_history.geography.route_map(query.route, query.trip)
+    except Exception:
+        raise HTTPException(503, "Static GTFS map temporarily unavailable") from None

@@ -170,8 +170,8 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
             {lineVehicles.length === 0 ? (
               <div className="py-8 text-center text-xs text-[#6B7280] bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
                 {language === 'it'
-                  ? 'Nessun mezzo attualmente monitorato su questa linea nello snapshot.'
-                  : 'No vehicles currently tracked for this route in the active snapshot.'}
+                  ? 'Nessuna osservazione corrente disponibile per questa linea.'
+                  : 'No current observations available for this route.'}
               </div>
             ) : (
               <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">

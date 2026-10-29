@@ -1,6 +1,6 @@
 import {PaginationControls} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { HistoryRecord, PageInfo, PageParams } from '../types/api';
+import { HistoryRecord, PageInfo, PageParams, CatalogRoute } from '../types/api';
 import {
   Calendar,
   History as HistoryIcon,
@@ -13,6 +13,7 @@ import { Translations, Language } from '../i18n/translations';
 
 interface HistorySectionProps {
   records: HistoryRecord[];
+  catalog?:CatalogRoute[];
   pageInfo?: PageInfo; onParametersChange?: (patch:PageParams)=>void; error?:boolean;
   loading: boolean;
   onFilterChange: (route?: string, majorOnly?: boolean) => void;
@@ -21,7 +22,7 @@ interface HistorySectionProps {
 }
 
 export const HistorySection: React.FC<HistorySectionProps> = ({
-  records,
+  records, catalog=[],
   pageInfo, onParametersChange, error,
   loading,
   onFilterChange,
@@ -84,13 +85,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
     }));
   }, [records, language]);
 
-  const availableRoutes = useMemo(() => {
-    const set = new Set<string>();
-    records.forEach((r) => {
-      if (r.route_id) set.add(r.route_id);
-    });
-    return Array.from(set).sort();
-  }, [records]);
+
 
   const debounceTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const pending=useRef<PageParams>({});
@@ -130,6 +125,10 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                 <option value="route_asc">{language==='it'?'Linea':'Route'}</option>
               </select>
             </div>}
+            {onParametersChange&&<div className="flex flex-wrap gap-2 text-xs">
+              <label>{language==='it'?'Da':'From'} <input aria-label={language==='it'?'Storico da data e ora':'History from date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>sendChange({from:event.target.value?new Date(event.target.value).toISOString():undefined})}/></label>
+              <label>{language==='it'?'A':'To'} <input aria-label={language==='it'?'Storico a data e ora':'History to date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>sendChange({to:event.target.value?new Date(event.target.value).toISOString():undefined})}/></label>
+            </div>}
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <select
@@ -141,9 +140,9 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                 <option value="all">
                   {t.history.filterAllLines}
                 </option>
-                {availableRoutes.map((r) => (
-                  <option key={r} value={r}>
-                    {language === 'it' ? 'Linea' : 'Route'} {r}
+                {catalog.map((r) => (
+                  <option key={r.route_id} value={r.route_id}>
+                    {r.route_short_name || r.route_id}{r.route_long_name ? ` - ${r.route_long_name}` : ''}
                   </option>
                 ))}
               </select>
@@ -219,7 +218,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
               ) : pageRecords.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-[#6B7280]">
-                    {t.history.empty}
+                    {selectedRoute!=='all' ? language==='it'?'Nessun dato storico disponibile per questa linea.':'No historical data available for this route.' : t.history.empty}
                   </td>
                 </tr>
               ) : (

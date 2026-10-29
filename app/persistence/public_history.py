@@ -35,6 +35,11 @@ def filtered(query, geography):
             C[name].ilike("%" + escaped + "%", escape="\\")
             for name in ("route_id", "stop_id", "trip_id", "vehicle_id")
         ]
+        route_ids = (
+            geography.matching_routes(query.query) if hasattr(geography, "matching_routes") else []
+        )
+        if route_ids:
+            expressions.append(C.route_id.in_(route_ids))
         if stop_ids:
             expressions.append(C.stop_id.in_(stop_ids))
         conditions.append(or_(*expressions))
@@ -81,6 +86,10 @@ class PublicHistory:
                 session.execute(
                     select(
                         func.count().label("total"),
+                        select(func.count(func.distinct(C.route_id)))
+                        .correlate(None)
+                        .scalar_subquery()
+                        .label("source_route_count"),
                         func.max(C.source_feed_timestamp).label("watermark"),
                     ).where(*conditions)
                 )
@@ -103,9 +112,12 @@ class PublicHistory:
         for row in rows:
             item = prediction(row)
             stop = self.geography.stops.get(item.stop_id, {})
+            route = getattr(self.geography, "routes", {}).get(item.route_id, {})
             items.append(
                 item.model_copy(
                     update={
+                        "route_short_name": route.get("route_short_name"),
+                        "route_type": route.get("route_type"),
                         "stop_name": stop.get("name"),
                         "stop_lat": stop.get("lat"),
                         "stop_lon": stop.get("lon"),
@@ -122,4 +134,5 @@ class PublicHistory:
             coverage="persisted_prediction_history",
             watermark=watermark,
             now=now,
+            source_route_count=stats["source_route_count"],
         )

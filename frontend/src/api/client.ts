@@ -1,13 +1,13 @@
 /** Anonymous read-only browser boundary. No operational endpoints or mock fallback. */
 import type { CurrentPrediction, CurrentPredictionsResponse, HistoryRecord, HistoryResponse,
-  HistoryQueryParams, ModelInfoResponse, PageParams, PageInfo } from '../types/api';
+  HistoryQueryParams, ModelInfoResponse, PageParams, PageInfo, CatalogRoute } from '../types/api';
 import { DOCUMENTED_MODEL_INFO } from './modelInfo';
 
 const APPROVED_ORIGIN = 'https://rome-mobility-intelligence-matteocavo.onrender.com';
 const configuredOrigin = import.meta.env?.VITE_PUBLIC_API_URL || APPROVED_ORIGIN;
 if (configuredOrigin.replace(/\/$/, '') !== APPROVED_ORIGIN) throw new Error('Invalid public API origin');
 const BASE_URL = import.meta.env?.DEV ? '' : APPROVED_ORIGIN;
-const ROUTES = new Set(['/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history']);
+const ROUTES = new Set(['/public/route-map', '/public/routes', '/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history']);
 const MAX_RESPONSE_BYTES = 256000;
 export class PublicApiError extends Error {
   constructor(readonly kind: 'unavailable' | 'response' | 'query') { super(kind); }
@@ -89,10 +89,21 @@ const pagination = (raw: any): PageInfo => {
   if (!Number.isInteger(raw.total) || raw.total<0 || !Number.isInteger(raw.page) || raw.page<1 ||
       ![10,20,50].includes(raw.page_size) || !Number.isInteger(raw.total_pages) || raw.total_pages<1 ||
       !Array.isArray(raw.items) || raw.items.length>raw.page_size) throw new PublicApiError('response');
-  return {total:raw.total,page:raw.page,page_size:raw.page_size,total_pages:raw.total_pages};
+  return {source_route_count:optionalNumber(raw.source_route_count),total:raw.total,page:raw.page,page_size:raw.page_size,total_pages:raw.total_pages};
 };
 export const api = {
   getBaseUrl: () => APPROVED_ORIGIN,
+  async getRouteMap(route:string,trip:string):Promise<[number,number][]> {
+    const raw=await publicGet('/public/route-map',new URLSearchParams({route,trip}));
+    if(raw.source!=='verified_static_gtfs'||raw.route_id!==route||raw.trip_id!==trip||!Array.isArray(raw.coordinates)||raw.coordinates.length>5000||!raw.coordinates.every((p:any)=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Math.abs(p[0])<=90&&Number.isFinite(p[1])&&Math.abs(p[1])<=180)) throw new PublicApiError('response');
+    return raw.available?raw.coordinates:[];
+  },
+  async getRoutes():Promise<CatalogRoute[]> {
+    const raw=await publicGet('/public/routes');
+    if(!Array.isArray(raw.items)||raw.total!==raw.items.length||raw.total>2000||!raw.items.every((r:any)=>
+      typeof r.route_id==='string' && typeof r.route_short_name==='string' && typeof r.route_long_name==='string' && Number.isInteger(r.route_type))) throw new PublicApiError('response');
+    return raw.items.map((r:CatalogRoute)=>({route_id:r.route_id,route_short_name:r.route_short_name,route_long_name:r.route_long_name,route_type:r.route_type}));
+  },
   async getSummary(progress?: (message:string,seconds:number)=>void) {
     const value = await publicGet('/public/summary',undefined,progress);
     if (value?.coverage !== 'current_scoring_population' || !Number.isInteger(value.scored_count) || value.scored_count < 0 ||
