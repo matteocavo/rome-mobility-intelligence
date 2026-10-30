@@ -102,7 +102,7 @@ def test_select_timing_log_has_only_safe_stages_and_aggregate_data(caplog):
     assert "fixture-only" not in record.message
 
 
-def test_budget_rejects_partial_export_and_closes():
+def test_budget_rejects_partial_export_and_closes(caplog):
     connection, cursor = MagicMock(), MagicMock()
     connection.cursor.return_value = cursor
     cursor.description = [("value",)]
@@ -112,6 +112,8 @@ def test_budget_rejects_partial_export_and_closes():
         DatabricksClient(configured(), lambda **kw: connection).select("SELECT 1", max_rows=1)
     cursor.close.assert_called_once()
     connection.close.assert_called_once()
+    assert "category=databricks_export_budget" in caplog.text
+    assert "fixture-only" not in caplog.text
 
 
 def test_connector_error_does_not_expose_secret():

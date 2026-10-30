@@ -43,10 +43,13 @@ class CurrentScoringRepository:
             "feature_preparation_batch_id",
             "feature_prepared_at",
         ):
-            for operation in ("MIN", "MAX", "COUNT"):
-                audits.append(
-                    f"{operation}({identifier(name)}) OVER () AS {name}_{operation.lower()}"
-                )
+            # Compare globally on the server rather than repeating long MIN/MAX
+            # strings on every result row. COUNT still rejects missing lineage.
+            column = identifier(name)
+            audits.extend([
+                f"COUNT({column}) OVER () AS {name}_count",
+                f"(MIN({column}) OVER () = MAX({column}) OVER ()) AS {name}_consistent",
+            ])
         query = f"""SELECT {columns}, {", ".join(audits)},
             COUNT(*) OVER () AS snapshot_rows,
             COUNT(*) OVER (PARTITION BY {grain}) AS grain_rows
@@ -81,7 +84,7 @@ class CurrentScoringRepository:
         ):
             if not frame[f"{name}_count"].eq(frame.snapshot_rows).all():
                 raise ValueError("Missing snapshot lineage")
-            if not frame[f"{name}_min"].eq(frame[f"{name}_max"]).all():
+            if not frame[f"{name}_consistent"].eq(True).fillna(False).all():
                 raise ValueError("Ambiguous snapshot lineage")
         if not frame.target_next_stop_sequence.gt(frame.stop_sequence).all():
             raise ValueError("Invalid next-stop identity")
