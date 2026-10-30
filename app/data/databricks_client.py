@@ -12,6 +12,7 @@ import sqlglot
 from sqlglot import exp
 
 from app.core.config import Settings
+from app.core.databricks_diagnostics import failure_category
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 from app.data.query_budget import QueryCapacityExceeded, QueryDeadlineExceeded, execute_bounded
 
@@ -123,9 +124,11 @@ class DatabricksClient:
                 return frame
             except DataAccessError:
                 raise
-            except Exception:
+            except Exception as error:
+                category = failure_category(error)
                 logger.warning(
-                    "databricks_select_timing outcome=failed elapsed_ms=%d",
+                    "databricks_failure stage=select category=%s elapsed_ms=%d",
+                    category,
                     round((time.perf_counter() - started) * 1000),
                 )
                 raise DataAccessError("Databricks SELECT failed; diagnostics suppressed") from None

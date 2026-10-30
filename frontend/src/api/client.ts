@@ -163,3 +163,6 @@ export const api = {
   },
   async getModelInfo(): Promise<ModelInfoResponse> { return structuredClone(DOCUMENTED_MODEL_INFO); },
 };
+
+// @ts-ignore
+export { validateSnapshot, parseSnapshot, parseStaticSnapshot, loadBundledSnapshot, loadStaticSnapshot, sourceAgeSeconds } from './snapshotSchema.js';

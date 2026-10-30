@@ -4,6 +4,7 @@ import json
 import os
 import re
 import socket
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -22,12 +23,48 @@ READY_FLAGS = (
     "database_configured",
     "prediction_persistence_enabled",
 )
+SAFE_CATEGORIES = frozenset({
+    "authentication_or_authorization", "client_error", "configuration", "connectivity_or_timeout",
+    "invalid_json_shape", "invalid_persistence_response", "not_found", "rate_limited",
+    "response_parse_error", "response_too_large", "server_error", "server_unavailable_or_timeout",
+    "transport_error", "truncated_response", "unknown",
+})
+
+
+def classify_status(status):
+    if status == 0:
+        return "connectivity_or_timeout"
+    if status in (401, 403):
+        return "authentication_or_authorization"
+    if status == 404:
+        return "not_found"
+    if status == 429:
+        return "rate_limited"
+    if status in (502, 503, 504):
+        return "server_unavailable_or_timeout"
+    if 500 <= status < 600:
+        return "server_error"
+    if 400 <= status < 500:
+        return "client_error"
+    return "unknown"
+
+
+def safe_stage(stage):
+    return stage if type(stage) is str and stage in SAFE_STAGES else "internal"
+
+
+def safe_category(category, status=None):
+    if category in SAFE_CATEGORIES:
+        return category
+    return classify_status(0 if status is None else status)
 
 
 class OrchestrationError(RuntimeError):
-    def __init__(self, stage):
-        # Only fixed internal stage names; never interpolate network diagnostics.
-        self.stage = stage if type(stage) is str and stage in SAFE_STAGES else "internal"
+    def __init__(self, stage, *, path=None, status=None, category=None):
+        self.stage = safe_stage(stage)
+        self.path = path if type(path) is str else None
+        self.status = 0 if status is None else int(status)
+        self.category = safe_category(category, self.status)
         super().__init__(f"Prediction orchestration failed: {self.stage}")
 
 
@@ -62,6 +99,15 @@ class Client:
             urllib.request.ProxyHandler({}), NoRedirect()
         )
         self.clock, self.sleep = clock, sleep
+        self.last_failure = None
+
+    def _record_failure(self, stage, path, status, category=None):
+        self.last_failure = {
+            "stage": safe_stage(stage),
+            "path": path if type(path) is str else None,
+            "status": 0 if status is None else int(status),
+            "category": safe_category(category, 0 if status is None else int(status)),
+        }
 
     def request(self, path, *, method="GET", timeout=15):
         request = urllib.request.Request(
@@ -77,7 +123,7 @@ class Client:
                 data = bytearray()
                 length = response.headers.get("Content-Length")
                 if length and (not length.isdigit() or int(length) > MAX_RESPONSE):
-                    raise OrchestrationError("response")
+                    raise OrchestrationError("response", path=path, status=response.status, category="response_too_large")
                 while True:
                     remaining = deadline - self.clock()
                     if remaining <= 0:
@@ -88,28 +134,26 @@ class Client:
                         break
                     data.extend(block)
                     if len(data) > MAX_RESPONSE:
-                        raise OrchestrationError("response")
+                        raise OrchestrationError("response", path=path, status=response.status, category="response_too_large")
                     if length and len(data) == int(length):
                         break
                 if length and len(data) != int(length):
-                    raise OrchestrationError("response")
+                    raise OrchestrationError("response", path=path, status=response.status, category="truncated_response")
                 value = json.loads(data)
                 if not isinstance(value, dict):
-                    raise OrchestrationError("response")
-                return 200, value
+                    raise OrchestrationError("response", path=path, status=response.status, category="invalid_json_shape")
+                return response.status, value
         except urllib.error.HTTPError as error:
             error.close()
             return error.code, None
         except (TimeoutError, socket.timeout):
             return 0, None
         except urllib.error.URLError as error:
-            # Only actual transport timeouts can retry a write, not arbitrary TLS,
-            # DNS, certificate or connection errors.
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 return 0, None
-            raise OrchestrationError("transport") from None
+            raise OrchestrationError("transport", path=path, status=0, category="transport_error") from None
         except Exception:
-            raise OrchestrationError("response") from None
+            raise OrchestrationError("response", path=path, status=0, category="response_parse_error") from None
 
     def warm(self, path, predicate, stage, *, deadline=None):
         deadline = self.clock() + WARM_BUDGET if deadline is None else deadline
@@ -121,15 +165,16 @@ class Client:
             if status == 200 and predicate(data):
                 return
             if status not in {0, 502, 503, 504} and not (path == "/ready" and status == 200):
-                raise OrchestrationError(stage)
+                self._record_failure(stage, path, status)
+                raise OrchestrationError(stage, path=path, status=status)
             if attempt < len(WARM_DELAYS) - 1 and deadline - self.clock() > delay:
                 self.sleep(delay)
             else:
                 break
-        raise OrchestrationError(stage)
+        self._record_failure(stage, path, 0)
+        raise OrchestrationError(stage, path=path, status=0)
 
     def run(self, *, history=False):
-        # One shared wake deadline, not a new four-minute budget for each stage.
         deadline = self.clock() + WARM_BUDGET
         self.warm("/health", lambda d: d.get("status") == "ok", "health", deadline=deadline)
         self.warm(
@@ -152,7 +197,7 @@ class Client:
                     any(type(v) is not int or v < 0 or v > 100 for v in values)
                     or values[1] + values[2] != values[0]
                 ):
-                    raise OrchestrationError("persistence_response")
+                    raise OrchestrationError("persistence_response", path="/predictions/current/persist?limit=100", status=status, category="invalid_persistence_response")
                 summary = dict(
                     zip(("rows_evaluated", "rows_inserted", "rows_existing"), values, strict=True)
                 )
@@ -165,24 +210,44 @@ class Client:
                     except OrchestrationError:
                         summary["history_followup_ok"] = False
                 return summary
+            self._record_failure("persistence", "/predictions/current/persist?limit=100", status)
             if status not in {0, 503, 504} or attempt == 2:
-                raise OrchestrationError("persistence")
+                category = classify_status(status)
+                if status in (401, 403):
+                    category = "authentication_or_authorization"
+                raise OrchestrationError("persistence", path="/predictions/current/persist?limit=100", status=status, category=category)
             self.sleep(delay)
-        raise OrchestrationError("persistence")
+        self._record_failure("persistence", "/predictions/current/persist?limit=100", 0)
+        raise OrchestrationError("persistence", path="/predictions/current/persist?limit=100", status=0)
 
 
 def main():
+    client = None
     try:
         client = Client(
             os.environ.get("RMI_API_BASE_URL", ""), os.environ.get("RMI_SERVICE_API_KEY", "")
         )
         print(json.dumps(client.run(history=os.environ.get("RMI_FETCH_HISTORY") == "true")))
     except OrchestrationError as error:
-        # Revalidate at the output boundary; never stringify an arbitrary exception.
-        stage = error.stage
-        safe = stage if type(stage) is str and stage in SAFE_STAGES else "internal"
-        raise SystemExit(f"Prediction orchestration failed: {safe}") from None
+        detail = {
+            "stage": error.stage,
+            "path": error.path,
+            "status": error.status,
+            "category": error.category,
+        }
+        detail = {k: v for k, v in detail.items() if v is not None and v != 0 or k == "status"}
+        # Keep status even when it is 0 (connectivity) because 0 is meaningful here.
+        detail = {
+            "stage": error.stage,
+            "path": error.path,
+            "status": error.status,
+            "category": error.category,
+        }
+        detail = {k: v for k, v in detail.items() if v is not None}
+        print(json.dumps({"error": "orchestration_failed", **detail}), file=sys.stderr)
+        raise SystemExit(f"Prediction orchestration failed: {safe_stage(error.stage)}") from None
     except Exception:
+        print(json.dumps({"error": "orchestration_failed", "stage": "internal", "category": "internal"}), file=sys.stderr)
         raise SystemExit("Prediction orchestration failed: internal") from None
 
 

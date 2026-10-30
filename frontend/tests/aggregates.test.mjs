@@ -21,6 +21,7 @@ function compile(folder) {
   }
 }
 compile('');
+for (const rel of ['api/snapshotSchema.js','data/snapshot.json']) { const src=join(root,'src',rel); const dst=join(temporary,rel); mkdirSync(dirname(dst),{recursive:true}); writeFileSync(dst,readFileSync(src)); }
 // Leaflet needs a browser; the map is irrelevant to these semantic checks.
 writeFileSync(join(temporary,'components/RouteMap.js'),"export const RouteMap=()=>null;");
 const React = await import('react');
@@ -139,8 +140,8 @@ test('model and claim copy matches the audited methodology and the data model', 
     assert.doesNotMatch(text,/massimizza il richiamo|maximize recall|indipendente fuori dal campione|independent out-of-time/);
     assert.doesNotMatch(text,/posizioni in tempo reale|ogni corsa in circolazione|each vehicle in service|live vehicle position|Modalità non disponibile|Mode unavailable|saranno collegati/);
   }
-  assert.equal(translations.it.status.preRelease,'v1.0.0');
-  assert.equal(translations.en.status.preRelease,'v1.0.0');
+  assert.equal(translations.it.status.preRelease,'v1.0.1');
+  assert.equal(translations.en.status.preRelease,'v1.0.1');
   assert.equal(translations.it.states.noCurrentData,'Nessun dato corrente');
   assert.equal(translations.en.states.noCurrentData,'No current data');
 });

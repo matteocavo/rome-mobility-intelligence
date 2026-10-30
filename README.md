@@ -242,3 +242,22 @@ IT/EN e mappa Leaflet. Usa le API pubbliche read-only per la popolazione scoring
 persistite, senza endpoint autenticati né fallback automatici ai mock. Build e deploy
 del backend FastAPI restano indipendenti. I limiti attuali di geografia e modalità
 sono documentati nel contratto frontend.
+
+## Static last-known-good snapshot (v1.0.1)
+
+The public dashboard uses a static last-known-good snapshot generated exclusively from previously acquired production data to provide an immediate first render on GitHub Pages. The frontend then hydrates automatically from the live API when the Render backend becomes available. Snapshot values retain their original observation timestamp and are never presented as newly acquired live data. The snapshot is validated before replacement; a failed refresh leaves the previous valid snapshot untouched. This remains compatible with the zero-cost GitHub Pages + Render Free deployment model.
+
+Snapshot refresh PRs use a stable branch and require the normal frontend/backend checks before human merge; GITHUB_TOKEN cannot bypass branch protection.
+
+Il workflow manuale `refresh-snapshot.yml` parte solo da `main`, conserva il candidato
+validato durante il cambio di branch e aggiorna `snapshot-refresh` senza force push.
+Riutilizza la PR aperta; un cambiamento del solo `capturedAt` non genera un commit.
+Un conflitto durante il merge di `main` interrompe il processo senza pubblicazione.
+I workflow `quality.yml` e `frontend.yml` vengono avviati esplicitamente tramite
+`workflow_dispatch` sul branch della PR, prima del merge umano. Il token del job
+richiede `contents: write`, `pull-requests: write` e `actions: write`; non serve un PAT.
+Nelle impostazioni Actions deve essere consentita la creazione di PR tramite Actions.
+Prima di considerare verificata l'automazione, eseguire una prova su GitHub:
+controllare il numero della PR su due esecuzioni, lo SHA dei check, il rispetto
+della protezione di `main` e il deploy Pages dopo un eventuale merge autorizzato.
+I test locali simulano Git/GitHub CLI e non sostituiscono questa verifica remota.

@@ -1,6 +1,7 @@
 """SQL-scoped OAuth M2M. No developer profile or personal-token fallback."""
 
 import base64
+import logging
 import ctypes
 import json
 import re
@@ -13,10 +14,17 @@ import urllib.request
 import uuid
 
 from app.core.config import Settings
+from app.core.databricks_diagnostics import failure_category
+
+
+logger = logging.getLogger(__name__)
 
 
 class WorkloadAuthenticationError(RuntimeError):
-    pass
+    def __init__(self, message, category='databricks_configuration'):
+        from app.core.databricks_diagnostics import CATEGORIES
+        self.category = category if category in CATEGORIES else 'databricks_unknown'
+        super().__init__(message)
 
 
 def read_windows_secret(target: str, client_id: str) -> str:
@@ -87,8 +95,10 @@ def exchange_token(host: str, client_id: str, secret: str) -> dict:
             if len(payload) > 65536:
                 raise ValueError("Oversized OAuth response")
             return json.loads(payload)
-    except Exception:
-        raise WorkloadAuthenticationError("Workload OAuth exchange failed") from None
+    except Exception as error:
+        category = failure_category(error)
+        logger.warning("databricks_failure stage=oauth category=%s", category)
+        raise WorkloadAuthenticationError("Workload OAuth exchange failed", category) from None
 
 
 class WorkloadCredentials:
