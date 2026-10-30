@@ -54,6 +54,38 @@ e flag mancanti/falsi falliscono lato applicazione. La verifica locale reale ha
 letto tutte le 27.449 righe in circa 24 s, con DataFrame finale di 24.867.664 byte.
 Anche questa correzione richiede verifica RSS nel runtime Render dopo il deploy.
 
+## Rilascio della heap libera: verifica ancora necessaria
+
+Sul main `e8cfe6d`, il processo `vrmss` ha completato due cicli reali con 27.449
+osservazioni: picco 422.850.560 byte (403,26 MiB) al primo e 483.692.544 byte
+(461,29 MiB) al secondo. Nessun nuovo OOM osservato in questi due cicli, ma il
+gate resta bloccato. Il solo rilascio dei riferimenti Python non dimostra che la
+heap nativa libera venga restituita al sistema operativo; non e una diagnosi
+conclusiva di memory leak o dell'allocator responsabile.
+
+Il follow-up richiede `malloc_trim(0)` alla libc del processo Linux dopo la
+raccolta degli oggetti irraggiungibili: prima della nuova lettura, dopo il ritiro
+della cache scaduta, e dopo il rilascio di DataFrame/probabilita temporanei. Non
+viene eseguito sulle letture della cache valida. La funzione restituisce solo
+pagine gia libere: modello, cache corrente e riferimenti dei lettori attivi
+restano validi. Sulle piattaforme senza il simbolo si conserva il comportamento
+precedente. Non si modifica l'allocator e non si caricano librerie da path esterni.
+
+Riferimento: [Linux malloc_trim](https://www.kernel.org/pub/linux/docs/man-pages/book/man-pages-6.12.pdf),
+rilascio best-effort di pagine libere della heap, thread-safe. Non garantisce un
+RSS massimo e non recupera memoria ancora referenziata o tutti i pool Arrow.
+I log numerici `reclaim_before` / `reclaim_after` permettono di misurare l'effetto.
+
+La CI Linux verifica in un subprocess che heap libera di un worker venga
+effettivamente restituita senza alterare un'allocazione ancora viva. I test della
+popolazione verificano anche i lettori della vecchia cache e l'assenza di reclaim
+nel percorso cache-hit. Queste prove non sostituiscono il runtime con il modello
+production: dopo merge/deploy serve verificare primo build e almeno tre rebuild
+consecutivi dopo TTL naturale, stesso processo, picchi/RSS e assenza di restart.
+Nessuna persistenza aggiuntiva e necessaria per questa misura. La release resta
+bloccata finche il margine non e dimostrato; nessun cap dati ridotto, piano paid,
+cambio modello, credenziale o modifica Databricks/Neon.
+
 ## Verifica dei cicli successivi sul commit `7f6a303`
 
 La summary production e tornata 200: 27.449 osservazioni, 307 linee, 435 linee nel

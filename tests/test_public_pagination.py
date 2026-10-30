@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from weakref import ref
 
 import numpy as np
@@ -97,6 +97,21 @@ def test_replacement_does_not_mutate_snapshot_owned_by_an_existing_reader():
     assert repository.population.call_count == 2
     assert [row.observation_id for row, _ in reader_snapshot[0]] == original_ids
     assert service._snapshot[0] is not reader_snapshot[0]
+
+
+def test_native_reclamation_only_runs_at_rebuild_boundaries_not_cached_pages():
+    service, _, repository = population()
+    with patch("app.services.public_population.reclaim_unused_memory") as reclaim:
+        service.page(PageQuery())
+        assert reclaim.call_count == 2
+        service.summary()
+        service.page(PageQuery(page=2))
+        service.aggregate(PageQuery())
+        assert reclaim.call_count == 2
+        service._expires = 0
+        service.page(PageQuery())
+        assert reclaim.call_count == 4
+    assert repository.population.call_count == 2
 
 
 def test_history_filters_bind_user_values_and_never_accept_identifier_input():
