@@ -1,6 +1,5 @@
 """Bounded whole-current-population inference/cache, with page operations after global filters."""
 
-import gc
 import hashlib
 import logging
 import time
@@ -20,7 +19,7 @@ from app.contracts.public import (
     page_response,
     probability_bins,
 )
-from app.core.memory_usage import log_memory
+from app.core.memory_usage import log_memory, reclaim_unused_memory
 from app.data.databricks_client import DataAccessError
 from app.services.public_summary import NetworkSummary, RouteRisk
 
@@ -83,7 +82,7 @@ class PublicPopulation:
             # population while loading/scoring its replacement. Existing readers
             # keep their own references; only unreachable retired objects are freed.
             cached = None
-            gc.collect()
+            reclaim_unused_memory()
             started = time.monotonic()
             source_started = time.perf_counter()
             log_memory("source_start")
@@ -263,6 +262,7 @@ class PublicPopulation:
             )
             # Free features/probabilities before publishing the compact public cache.
             del frame, values, delays
+            reclaim_unused_memory()
             self._rows, self._summary = result, summary
             self._expires = time.monotonic() + 300
             self._snapshot = (self._rows, self._summary, self._expires)
