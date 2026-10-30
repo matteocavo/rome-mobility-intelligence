@@ -108,7 +108,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
         rate: (data.major / data.total) * 100,
       }))
       .sort((a, b) => b.rate - a.rate)
-      .slice(0, 5);
+      .slice(0, 8);
   }, [predictions]);
 
   // Initialize Map
@@ -588,7 +588,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                     <button
                       key={item.route}
                       onClick={() => onSelectLine(item.route)}
-                      className="w-full text-left p-2 rounded-lg hover:bg-[#FDF2F4] transition-all group flex flex-col space-y-1 border border-transparent hover:border-[#F1C3CA] cursor-pointer"
+                      className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-[#FDF2F4] transition-all group flex flex-col space-y-1 border border-transparent hover:border-[#F1C3CA] cursor-pointer"
                     >
                       <div className="flex items-center justify-between text-xs w-full">
                         <div className="flex items-center space-x-2">

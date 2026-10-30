@@ -38,6 +38,14 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isConnected = backendOnline && !isFallback && !unavailable && !isWaking;
+  const statusLabel = isWaking
+    ? (wakingMessage || t.status.wakingService)
+    : unavailable
+      ? (language === 'it' ? 'Dati non disponibili' : 'Data unavailable')
+      : isConnected ? t.status.connectedData : t.status.liveApi;
+  const statusDot = unavailable && !isWaking
+    ? 'bg-[#8E001C]' : isConnected ? 'bg-[#10B981]' : 'bg-[#FFB300]';
 
   const navItems = [
     { id: 'overview', label: t.nav.overview },
@@ -113,8 +121,11 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Integrated Subtle Data Status */}
             {unavailable && !isWaking ? (
               <>
-                <span role="status" className="hidden sm:inline text-xs">{language === 'it' ? 'Dati non disponibili' : 'Data unavailable'}</span>
-                <span role="status" aria-label={language === 'it' ? 'Dati non disponibili' : 'Data unavailable'} className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FDF2F4] text-[#8E001C] border border-[#F2C8D0]">
+                <span role="status" className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]">
+                  <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                  <span>{statusLabel}</span>
+                </span>
+                <span role="status" aria-label={statusLabel} className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FDF2F4] text-[#8E001C] border border-[#F2C8D0]">
                   <Activity className="w-3.5 h-3.5" />
                 </span>
               </>
@@ -130,13 +141,14 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             ) : (
               <div
+                role="status"
                 className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]"
-                title={!backendOnline ? (unavailable ? t.states.unavailable : t.status.connectingData) : (language === 'it' ? 'Lettura API pubblica' : 'Public API read')}
+                title={statusLabel}
               >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
+                <span aria-hidden="true"
+                  className={`w-1.5 h-1.5 rounded-full ${statusDot}`}
                 ></span>
-                <span>{t.status.liveApi}</span>
+                <span>{statusLabel}</span>
               </div>
             )}
 
@@ -216,11 +228,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           ))}
           <div className="pt-2 border-t border-[#E5E7EB] flex items-center justify-between text-xs text-[#6B7280]">
-            <span className="flex items-center space-x-1">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
+            <span role="status" className="flex items-center space-x-1">
+              <span aria-hidden="true"
+                className={`w-1.5 h-1.5 rounded-full ${statusDot}`}
               ></span>
-              <span>{t.status.liveApi}</span>
+              <span>{statusLabel}</span>
             </span>
             <span>{t.status.preRelease}</span>
           </div>
