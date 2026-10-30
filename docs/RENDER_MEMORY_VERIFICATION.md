@@ -101,3 +101,33 @@ cache del servizio. Il fix elimina tale riferimento e raccoglie gli oggetti
 irraggiungibili prima delle nuove allocazioni. I lettori attivi conservano i propri
 riferimenti: nessuna lista viene svuotata in-place. L'effetto sul RSS va misurato
 di nuovo nel runtime effettivo; il solo test di lifetime non prova un nuovo picco.
+
+## Verifica production dopo PR #34: completata
+
+Il 30 ottobre 2026, dalle 13:02 alle 13:21 (Europe/Amsterdam), il deploy
+`ce8320118725d40f335f6a6eaf7fac1ac27049e0` ha completato una prima costruzione e
+tre rebuild dopo TTL naturale di 300 s nello stesso processo `gfkmj`.
+Ogni ciclo ha letto l'intera popolazione disponibile: 21.205 osservazioni,
+292 linee, watermark `2026-10-30T09:47:41Z`. Le richieste di verifica erano
+sequenziali; summary, pagina current e aggregate sono risultati coerenti.
+
+| Ciclo | Picco cumulativo campionato (MiB) | RSS cache pronta (MiB) |
+| --- | ---: | ---: |
+| 1 | 354,48 | 338,21 |
+| 2 | 402,04 | 386,47 |
+| 3 | 417,03 | 400,27 |
+| 4 | 417,03 | 399,75 |
+
+Il picco usa il massimo dei campioni RSS/VmHWM gia osservati: le letture `/proc`
+non sono un campionatore continuo del cgroup. Dopo il quarto ciclo la memoria
+non e cresciuta rispetto al terzo. I log prima/dopo mostrano il rilascio di
+circa 16-17 MiB al termine di ciascuna costruzione. Gli Events non mostrano OOM
+o restart successivi al deploy durante questa verifica. Il margine osservato e
+circa 95 MiB rispetto ai 512 MiB nominali del piano Free.
+
+Esito: gate positivo **nel carico osservato**. La precedente prova su 27.449 righe
+aveva una popolazione diversa: non attribuire tutta la differenza al fix e non
+estrapolare una garanzia sul cap di 50.000 righe o su concorrenza arbitraria.
+Restano necessari monitoraggio e comportamento fail-closed sui budget; nessun
+SLA real-time o garanzia assoluta di assenza di OOM. La verifica non ha eseguito
+nuove persistenze, cambi di piano, modello, credenziali o risorse Databricks/Neon.
