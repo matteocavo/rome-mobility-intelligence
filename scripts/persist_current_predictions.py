@@ -292,15 +292,8 @@ def main():
             "category": error.category,
         }
         detail = {k: v for k, v in detail.items() if v is not None}
-        print(json.dumps({"error": "orchestration_failed", **detail}), file=sys.stderr)
         raise SystemExit(f"Prediction orchestration failed: {safe_stage(error.stage)}") from None
     except Exception:
-        print(
-            json.dumps(
-                {"error": "orchestration_failed", "stage": "internal", "category": "internal"}
-            ),
-            file=sys.stderr,
-        )
         raise SystemExit("Prediction orchestration failed: internal") from None
 
 
