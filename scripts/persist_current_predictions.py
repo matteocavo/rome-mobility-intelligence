@@ -13,43 +13,22 @@ from urllib.parse import urlsplit
 MAX_RESPONSE = 65536
 WARM_BUDGET = 240
 WARM_DELAYS = (30, 45, 45, 45, 0)
-SAFE_STAGES = frozenset(
-    {
-        "configuration",
-        "health",
-        "ready",
-        "persistence",
-        "persistence_response",
-        "transport",
-        "response",
-        "internal",
-    }
-)
+SAFE_STAGES = frozenset({
+    "configuration", "health", "ready", "persistence", "persistence_response",
+    "transport", "response", "internal",
+})
 READY_FLAGS = (
     "model_ready",
     "workload_identity_configured",
     "database_configured",
     "prediction_persistence_enabled",
 )
-SAFE_CATEGORIES = frozenset(
-    {
-        "authentication_or_authorization",
-        "client_error",
-        "configuration",
-        "connectivity_or_timeout",
-        "invalid_json_shape",
-        "invalid_persistence_response",
-        "not_found",
-        "rate_limited",
-        "response_parse_error",
-        "response_too_large",
-        "server_error",
-        "server_unavailable_or_timeout",
-        "transport_error",
-        "truncated_response",
-        "unknown",
-    }
-)
+SAFE_CATEGORIES = frozenset({
+    "authentication_or_authorization", "client_error", "configuration", "connectivity_or_timeout",
+    "invalid_json_shape", "invalid_persistence_response", "not_found", "rate_limited",
+    "response_parse_error", "response_too_large", "server_error", "server_unavailable_or_timeout",
+    "transport_error", "truncated_response", "unknown",
+})
 
 
 def classify_status(status):
@@ -144,12 +123,7 @@ class Client:
                 data = bytearray()
                 length = response.headers.get("Content-Length")
                 if length and (not length.isdigit() or int(length) > MAX_RESPONSE):
-                    raise OrchestrationError(
-                        "response",
-                        path=path,
-                        status=response.status,
-                        category="response_too_large",
-                    )
+                    raise OrchestrationError("response", path=path, status=response.status, category="response_too_large")
                 while True:
                     remaining = deadline - self.clock()
                     if remaining <= 0:
@@ -160,26 +134,14 @@ class Client:
                         break
                     data.extend(block)
                     if len(data) > MAX_RESPONSE:
-                        raise OrchestrationError(
-                            "response",
-                            path=path,
-                            status=response.status,
-                            category="response_too_large",
-                        )
+                        raise OrchestrationError("response", path=path, status=response.status, category="response_too_large")
                     if length and len(data) == int(length):
                         break
                 if length and len(data) != int(length):
-                    raise OrchestrationError(
-                        "response",
-                        path=path,
-                        status=response.status,
-                        category="truncated_response",
-                    )
+                    raise OrchestrationError("response", path=path, status=response.status, category="truncated_response")
                 value = json.loads(data)
                 if not isinstance(value, dict):
-                    raise OrchestrationError(
-                        "response", path=path, status=response.status, category="invalid_json_shape"
-                    )
+                    raise OrchestrationError("response", path=path, status=response.status, category="invalid_json_shape")
                 return response.status, value
         except urllib.error.HTTPError as error:
             error.close()
@@ -189,13 +151,9 @@ class Client:
         except urllib.error.URLError as error:
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 return 0, None
-            raise OrchestrationError(
-                "transport", path=path, status=0, category="transport_error"
-            ) from None
+            raise OrchestrationError("transport", path=path, status=0, category="transport_error") from None
         except Exception:
-            raise OrchestrationError(
-                "response", path=path, status=0, category="response_parse_error"
-            ) from None
+            raise OrchestrationError("response", path=path, status=0, category="response_parse_error") from None
 
     def warm(self, path, predicate, stage, *, deadline=None):
         deadline = self.clock() + WARM_BUDGET if deadline is None else deadline
@@ -239,12 +197,7 @@ class Client:
                     any(type(v) is not int or v < 0 or v > 100 for v in values)
                     or values[1] + values[2] != values[0]
                 ):
-                    raise OrchestrationError(
-                        "persistence_response",
-                        path="/predictions/current/persist?limit=100",
-                        status=status,
-                        category="invalid_persistence_response",
-                    )
+                    raise OrchestrationError("persistence_response", path="/predictions/current/persist?limit=100", status=status, category="invalid_persistence_response")
                 summary = dict(
                     zip(("rows_evaluated", "rows_inserted", "rows_existing"), values, strict=True)
                 )
@@ -262,19 +215,10 @@ class Client:
                 category = classify_status(status)
                 if status in (401, 403):
                     category = "authentication_or_authorization"
-                raise OrchestrationError(
-                    "persistence",
-                    path="/predictions/current/persist?limit=100",
-                    status=status,
-                    category=category,
-                )
+                raise OrchestrationError("persistence", path="/predictions/current/persist?limit=100", status=status, category=category)
             self.sleep(delay)
         self._record_failure("persistence", "/predictions/current/persist?limit=100", 0)
-        raise OrchestrationError(
-            "persistence",
-            path="/predictions/current/persist?limit=100",
-            status=0,
-        )
+        raise OrchestrationError("persistence", path="/predictions/current/persist?limit=100", status=0)
 
 
 def main():
@@ -303,8 +247,7 @@ def main():
         print(json.dumps({"error": "orchestration_failed", **detail}), file=sys.stderr)
         raise SystemExit(f"Prediction orchestration failed: {safe_stage(error.stage)}") from None
     except Exception:
-        payload = {"error": "orchestration_failed", "stage": "internal", "category": "internal"}
-        print(json.dumps(payload), file=sys.stderr)
+        print(json.dumps({"error": "orchestration_failed", "stage": "internal", "category": "internal"}), file=sys.stderr)
         raise SystemExit("Prediction orchestration failed: internal") from None
 
 
