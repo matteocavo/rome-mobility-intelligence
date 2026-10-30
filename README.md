@@ -1,4 +1,4 @@
-# Rome Mobility Intelligence v1.0.0
+# Rome Mobility Intelligence v1.0.1
 
 **Orchestrazione OCI opzionale — Deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
@@ -13,7 +13,7 @@ richiedono circa 213 e 194 secondi. Questo risultato non autorizza il provisioni
 il repository Data/ML che alimenta questo runtime applicativo.
 
 Applicazione pubblica **FastAPI + scikit-learn** per il ML operativo del trasporto pubblico di Roma.
-Stato: **v1.0.0 — frontend GitHub Pages e backend Render Free live, prediction history Neon attiva**.
+Stato: **v1.0.1 — frontend GitHub Pages e backend Render Free live, prediction history Neon attiva**.
 HistGradientBoosting con pesi di inclusione, soglia validation 0.35; TEST valutato una volta.
 Nessuno SLA real-time garantito. Applicazione: <https://matteocavo.github.io/rome-mobility-intelligence/>.
 Backend: <https://rome-mobility-intelligence-matteocavo.onrender.com>. [Risultati e limiti](docs/REAL_MODEL_EVALUATION.md).
@@ -26,8 +26,9 @@ Il cron richiede due esecuzioni/ora, ma la delivery osservata è irregolare: non
 una cadenza di 30 minuti. [Limiti e diagnostica](docs/ZERO_COST_DEPLOYMENT.md#schedule-and-failure-semantics).
 n8n: integrazione low-code scelta e preparata, non ancora installata su OCI.
 Una subscription n8n Cloud a pagamento non può essere un requisito obbligatorio.
-La delivery privata del modello e i gate del deployment reale restano da completare;
-il test E2 Micro non verifica l'overhead OS/Docker della VM né il burst OCI.
+La delivery privata del modello su Render e i controlli production della v1.0.1 sono
+completati nel carico osservato; [misure e limiti memoria](docs/RENDER_MEMORY_VERIFICATION.md).
+Il test E2 Micro non verifica l'overhead OS/Docker della VM né il burst OCI.
 [Architettura, quote e blocker](docs/ZERO_COST_DEPLOYMENT.md).
 
 Il [repository Data/ML](https://github.com/matteocavo/rome-public-transport-reliability)
@@ -123,7 +124,7 @@ dagli endpoint inference fuori da `ENVIRONMENT=test`. `/ready` non esegue query 
 [Contratti, errori, esempi sintetici e limiti](docs/INFERENCE_API.md).
 Prediction history PostgreSQL è opzionale e disabilitata di default.
 
-## Frontend pubblico — v1.0.0
+## Frontend pubblico — v1.0.1
 
 URL production: <https://matteocavo.github.io/rome-mobility-intelligence/>.
 Il frontend React/Vite usa GitHub Pages e chiama soltanto le API anonime read-only del

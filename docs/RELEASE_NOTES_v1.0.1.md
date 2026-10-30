@@ -1,4 +1,4 @@
-# Rome Mobility Intelligence v1.0.1 — release candidate
+# Rome Mobility Intelligence v1.0.1
 
 ## Correzioni
 
@@ -15,6 +15,9 @@
   la validazione delle 47 feature usa blocchi da 1.024 righe. Nessuna popolazione
   viene ridotta alle sole righe mostrate dal frontend.
 - Versione API e package allineata a 1.0.1.
+- Audit globale di lineage compatto, senza aumentare i budget della popolazione.
+- Cache ritirata e temporanei rilasciati prima delle nuove allocazioni; rilascio
+  best-effort delle pagine heap gia libere durante le ricostruzioni su Linux.
 
 ## Refresh del bundle
 
@@ -24,14 +27,26 @@ non generano commit. I check vengono avviati tramite dispatch prima del merge um
 Serve il permesso repository che consente ad Actions di creare PR; non viene
 abilitato da questa patch. Nessun merge o deploy automatico nel workflow refresh.
 
-## Gate production ancora necessario
+## Verifica production completata
 
 La v1.0.0 e il suo tag pubblicato restano invariati. Il backend production ha
 registrato un OOM oltre 512 MB sul commit `103ec73` il 30 ottobre 2026.
-La riduzione dei buffer e i log `serving_memory` richiedono una verifica sul runtime
-Render: i test locali non dimostrano da soli l'assenza di ulteriori OOM.
+Il follow-up `ce83201` e stato verificato su Render Free il 30 ottobre 2026:
+prima costruzione e tre rebuild dopo TTL naturale, stesso processo `gfkmj`,
+21.205 osservazioni e 292 linee. Il picco massimo campionato e circa 417 MiB su
+512 MiB; RSS dopo il terzo/quarto ciclo circa 400/400 MiB, senza restart osservati.
+La popolazione precedente era diversa: non e un confronto prestazionale a parita
+di righe e non garantisce assenza di OOM con carichi futuri o qualsiasi concorrenza.
+[Serie dei campioni e limiti](RENDER_MEMORY_VERIFICATION.md).
 
-Prima del tag stabile: merge e deploy autorizzati, smoke pubblico e persistenza
-controllata, misura della memoria durante prima costruzione e ricostruzione della
-popolazione, verifica del refresh PR e dei check sullo SHA corretto. Nessun upgrade
-paid, modifica Databricks/Neon, cambio modello o riuso di history come nuovi dati current.
+API pubbliche, pagination, aggregate e CORS verificati; catalogo GTFS 435 linee,
+storico 600 righe. Un run manuale ha inserito 100 righe; il successivo
+[run automatico](https://github.com/matteocavo/rome-mobility-intelligence/actions/runs/41038146805)
+con trigger `schedule` ha trovato le stesse 100 righe gia presenti, senza retry
+o nuove scritture. Due refresh hanno riutilizzato la stessa PR #32.
+
+Il bundle last-known-good conserva dati reali validati e il loro watermark;
+non rappresenta una promessa di aggiornamento real-time. History resta distinta
+dal current. Nessun upgrade paid, modifica Databricks/schema Neon, cambio modello
+o riuso di history come nuove previsioni correnti. Cold start e 503 temporanei
+durante una costruzione gia in corso restano possibili nel piano Free.
