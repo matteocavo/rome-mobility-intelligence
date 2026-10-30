@@ -1,9 +1,9 @@
 """SQL-scoped OAuth M2M. No developer profile or personal-token fallback."""
 
 import base64
-import logging
 import ctypes
 import json
+import logging
 import re
 import ssl
 import sys
@@ -15,7 +15,6 @@ import uuid
 
 from app.core.config import Settings
 from app.core.databricks_diagnostics import failure_category
-
 
 logger = logging.getLogger(__name__)
 
