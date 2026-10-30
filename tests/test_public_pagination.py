@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock
+from weakref import ref
 
 import numpy as np
 import pandas as pd
@@ -64,6 +65,38 @@ def test_cached_whole_population_failure_never_returns_partial_old_page():
     with pytest.raises(DataAccessError):
         service.page(PageQuery())
     assert repository.population.call_count == 2
+
+
+def test_retired_cache_is_released_before_loading_replacement():
+    class WeakRows(list):
+        pass
+
+    service, _, repository = population()
+    service.summary()
+    # A weak-referenceable list proves object lifetime, not an unreliable RSS guess.
+    service._rows = WeakRows(service._rows)
+    service._snapshot = (service._rows, service._summary, service._expires)
+    retired = ref(service._rows)
+    service._expires = 0
+    source = repository.population.return_value
+
+    def reload():
+        assert retired() is None, "Expired rows must not overlap the next source DataFrame"
+        return source
+
+    repository.population.side_effect = reload
+    assert service.summary().scored_count == 101
+
+
+def test_replacement_does_not_mutate_snapshot_owned_by_an_existing_reader():
+    service, _, repository = population()
+    reader_snapshot = service._ensure()
+    original_ids = [row.observation_id for row, _ in reader_snapshot[0]]
+    service._expires = 0
+    assert service.summary().scored_count == 101
+    assert repository.population.call_count == 2
+    assert [row.observation_id for row, _ in reader_snapshot[0]] == original_ids
+    assert service._snapshot[0] is not reader_snapshot[0]
 
 
 def test_history_filters_bind_user_values_and_never_accept_identifier_input():

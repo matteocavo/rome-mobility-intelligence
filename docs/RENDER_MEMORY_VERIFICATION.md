@@ -53,3 +53,19 @@ restano sullo snapshot completo prima del LIMIT; i NULL falliscono tramite COUNT
 e flag mancanti/falsi falliscono lato applicazione. La verifica locale reale ha
 letto tutte le 27.449 righe in circa 24 s, con DataFrame finale di 24.867.664 byte.
 Anche questa correzione richiede verifica RSS nel runtime Render dopo il deploy.
+
+## Verifica dei cicli successivi sul commit `7f6a303`
+
+La summary production e tornata 200: 27.449 osservazioni, 307 linee, 435 linee nel
+catalogo GTFS. Il run manuale di persistenza ha inserito 100 righe senza retry;
+due refresh hanno aggiornato la stessa PR #32, senza duplicazioni o push su main.
+
+La prima costruzione ha raggiunto 418.320.384 byte di picco RSS (circa 399 MiB).
+La seconda, dopo la naturale scadenza della cache, ha raggiunto 492.261.376 byte
+(circa 469 MiB): il margine richiede un'ulteriore correzione prima della release.
+Un test con weak reference dimostra che il riferimento locale `cached` trattiene
+la vecchia popolazione durante la nuova lettura, anche dopo l'azzeramento della
+cache del servizio. Il fix elimina tale riferimento e raccoglie gli oggetti
+irraggiungibili prima delle nuove allocazioni. I lettori attivi conservano i propri
+riferimenti: nessuna lista viene svuotata in-place. L'effetto sul RSS va misurato
+di nuovo nel runtime effettivo; il solo test di lifetime non prova un nuovo picco.
