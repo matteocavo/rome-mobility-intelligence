@@ -1,4 +1,5 @@
-from scripts.persist_current_predictions import safe_stage, safe_category, OrchestrationError
+from scripts.persist_current_predictions import OrchestrationError, safe_category, safe_stage
+
 
 def test_safe_stage_rejects_unknown():
     assert safe_stage("not-a-stage") == "internal"
