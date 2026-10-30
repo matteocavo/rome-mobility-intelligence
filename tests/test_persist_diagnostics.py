@@ -58,6 +58,7 @@ def response_client(body, *, length=None):
         (b"{}", MAX_RESPONSE + 1, "response_too_large"),
         (b"{}", 5, "truncated_response"),
         (b"[]", None, "invalid_json_shape"),
+        (b"{", None, "response_parse_error"),
     ],
 )
 def test_request_preserves_specific_response_failure(body, length, category):

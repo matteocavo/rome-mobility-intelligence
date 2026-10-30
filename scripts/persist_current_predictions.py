@@ -147,9 +147,11 @@ class Client:
             method=method,
             headers={"X-RMI-Service-Key": self.key, "Accept": "application/json"},
         )
+        status = 0
         try:
             deadline = self.clock() + timeout
             with self.opener.open(request, timeout=timeout) as response:
+                status = safe_status(response.status)
                 if response.status != 200:
                     return response.status, None
                 data = bytearray()
@@ -201,7 +203,7 @@ class Client:
             raise
         except Exception:
             raise OrchestrationError(
-                "response", path=path, status=0, category="response_parse_error"
+                "response", path=path, status=status, category="response_parse_error"
             ) from None
 
     def warm(self, path, predicate, stage, *, deadline=None):
