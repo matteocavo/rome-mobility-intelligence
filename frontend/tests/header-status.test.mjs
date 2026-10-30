@@ -34,7 +34,7 @@ function props(language, state = {}) {
 }
 
 for (const count of [3, 10]) {
-  test(`map-side ranking shows up to eight available routes (${count} available)`, () => {
+  test(`map-side ranking shows up to seven available routes (${count} available)`, () => {
     const predictions = Array.from({ length: count }, (_, i) => ({ route_id: `route-${i}`,
       stop_id: `stop-${i}`, trip_id: `trip-${i}`, route_type: 3, major_delay_probability: .9 }));
     const dom = new JSDOM(renderToStaticMarkup(React.createElement(CentralMobilityMap, {
@@ -44,9 +44,9 @@ for (const count of [3, 10]) {
     })));
     try {
       const panel = dom.window.document.querySelector('[class*="lg:col-span-4"]');
-      assert.equal(panel.querySelectorAll('button').length, Math.min(count, 8));
-      assert.ok(panel.textContent.includes(`route-${Math.min(count, 8) - 1}`));
-      assert.ok(!panel.textContent.includes('route-8'));
+      assert.equal(panel.querySelectorAll('button').length, Math.min(count, 7));
+      assert.ok(panel.textContent.includes(`route-${Math.min(count, 7) - 1}`));
+      assert.ok(!panel.textContent.includes('route-7'));
     } finally { dom.window.close(); }
   });
 }
