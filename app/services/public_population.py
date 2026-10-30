@@ -1,5 +1,6 @@
 """Bounded whole-current-population inference/cache, with page operations after global filters."""
 
+import gc
 import hashlib
 import logging
 import time
@@ -78,6 +79,11 @@ class PublicPopulation:
             if model is None or (model.metadata.synthetic and not self.test_mode):
                 raise DataAccessError("Operational model unavailable")
             self._rows, self._summary, self._snapshot = [], None, None
+            # The local fast-path reference otherwise retains the entire expired
+            # population while loading/scoring its replacement. Existing readers
+            # keep their own references; only unreachable retired objects are freed.
+            cached = None
+            gc.collect()
             started = time.monotonic()
             source_started = time.perf_counter()
             log_memory("source_start")
