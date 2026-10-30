@@ -11,6 +11,7 @@ export interface Translations {
   };
   status: {
     liveApi: string;
+    connectedData: string;
     demoData: string;
     wakingService: string;
     connectingData: string;
@@ -301,6 +302,7 @@ export const translations: Record<Language, Translations> = {
     },
     status: {
       liveApi: 'Ultimi dati disponibili',
+      connectedData: 'Connessione dati attiva',
       demoData: 'Dati dimostrativi',
       wakingService: 'Avvio del servizio dati…',
       connectingData: 'Connessione agli ultimi dati disponibili…',
@@ -642,6 +644,7 @@ export const translations: Record<Language, Translations> = {
     },
     status: {
       liveApi: 'Latest available data',
+      connectedData: 'Data connection active',
       demoData: 'Synthetic data',
       wakingService: 'Waking data service…',
       connectingData: 'Connecting to latest data…',
