@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app import __version__
 from app.core.service_auth import SERVICE_HEADER, ServiceAuthError, verify_service_key
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 
@@ -9,7 +10,7 @@ router = APIRouter()
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "service": "rome-mobility-intelligence", "version": "0.1.0"}
+    return {"status": "ok", "service": "rome-mobility-intelligence", "version": __version__}
 
 
 @router.get("/ready")

@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.api.routes import health, history, inference, model, public
 from app.core.config import Settings
 from app.core.deployment import validate_deployment
@@ -77,7 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     production = cfg.environment == "production"
     application = FastAPI(
         title="Rome Mobility Intelligence",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
         docs_url=None if production else "/docs",
         redoc_url=None if production else "/redoc",

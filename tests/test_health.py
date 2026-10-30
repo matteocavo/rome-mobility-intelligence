@@ -17,7 +17,7 @@ def test_health_and_skeleton_readiness():
     with service_client(create_app(security_settings(_env_file=None))) as client:
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json()["version"] == "0.1.0"
+        assert response.json()["version"] == "1.0.1"
         assert client.get("/ready").json()["mode"] == "skeleton"
         assert client.get("/model/info").status_code == 503
         assert client.post("/predict").status_code == 503

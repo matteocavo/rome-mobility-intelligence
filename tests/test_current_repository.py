@@ -47,6 +47,25 @@ def test_current_fixed_query_budgets_and_contract(scoring_frame):
     assert kwargs == {"max_rows": 2, "max_bytes": 8_000_000}
 
 
+def test_population_validation_reaches_rows_after_first_chunk(scoring_frame):
+    source = pd.concat([scoring_frame] * 513, ignore_index=True)
+    source["entity_id"] = [f"synthetic-{i}" for i in range(len(source))]
+    source["snapshot_rows"] = len(source)
+    for name in (
+        "feature_contract_hash", "source_silver_version",
+        "feature_preparation_batch_id", "feature_prepared_at",
+    ):
+        source[name + "_count"] = len(source)
+    client = Mock()
+    client.select.return_value = source
+    repository = CurrentScoringRepository(client, Settings(_env_file=None))
+    assert len(repository.population()) == 1026
+    source["feed_hour"] = source["feed_hour"].astype(object)
+    source.loc[len(source) - 1, "feed_hour"] = "invalid-after-first-1024"
+    with pytest.raises(ValueError):
+        repository.population()
+
+
 @pytest.mark.parametrize(
     "problem",
     ["empty", "hash", "grain", "lineage", "missing_lineage", "future", "feature", "next_stop"],

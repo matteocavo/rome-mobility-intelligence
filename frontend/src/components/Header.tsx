@@ -15,6 +15,7 @@ interface HeaderProps {
   activeSection: string;
   onNavigate: (sectionId: string) => void;
   isFallback: boolean;
+  backendOnline?: boolean;
   unavailable?: boolean;
   isWaking: boolean;
   wakingMessage: string;
@@ -29,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeSection,
   onNavigate,
   isFallback,
+  backendOnline = false,
   unavailable,
   isWaking,
   wakingMessage,
@@ -129,12 +131,12 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <div
                 className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]"
-                title={isFallback ? 'Dataset operativo di riferimento' : (language === 'it' ? 'Lettura API pubblica' : 'Public API read')}
+                title={!backendOnline ? (unavailable ? t.states.unavailable : t.status.connectingData) : (language === 'it' ? 'Lettura API pubblica' : 'Public API read')}
               >
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${isFallback ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
+                  className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
                 ></span>
-                <span>{isFallback ? t.status.demoData : t.status.liveApi}</span>
+                <span>{t.status.liveApi}</span>
               </div>
             )}
 
@@ -216,9 +218,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="pt-2 border-t border-[#E5E7EB] flex items-center justify-between text-xs text-[#6B7280]">
             <span className="flex items-center space-x-1">
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isFallback ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
+                className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
               ></span>
-              <span>{isFallback ? t.status.demoData : t.status.liveApi}</span>
+              <span>{t.status.liveApi}</span>
             </span>
             <span>{t.status.preRelease}</span>
           </div>

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rome-mobility-intelligence"
-version = "1.0.0"
+version = "1.0.1"
 license = {text = "Apache-2.0"}
 description = "FastAPI and sklearn foundation for Rome mobility data"
 requires-python = ">=3.11"

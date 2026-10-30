@@ -21,6 +21,7 @@ function compile(folder) {
   }
 }
 compile('');
+for (const rel of ['api/snapshotSchema.js','data/snapshot.json']) { const src=join(root,'src',rel); const dst=join(temporary,rel); mkdirSync(dirname(dst),{recursive:true}); writeFileSync(dst,readFileSync(src)); }
 const {api, parseRows, publicGet, PublicApiError} = await import(pathToFileURL(join(temporary,'api/client.js')));
 const {stopDetails, escapeHtml} = await import(pathToFileURL(join(temporary,'api/geography.js')));
 after(() => rmSync(temporary, {recursive:true, force:true}));

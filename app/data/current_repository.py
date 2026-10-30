@@ -92,12 +92,14 @@ class CurrentScoringRepository:
             raise ValueError("Future or invalid scoring watermark")
         # Validate only the explicit 47-feature projection, never identifiers or targets.
         # Stream validation: never materialize N x 47 boxed values/dicts at once.
-        for values in frame.loc[:, list(FEATURES)].itertuples(index=False, name=None):
-            clean = {
-                key: None if pd.isna(value) else value
-                for key, value in zip(FEATURES, values, strict=True)
-            }
-            PredictRequest.model_validate(clean)
+        for start in range(0, len(frame), 1024):
+            chunk = frame.iloc[start : start + 1024].loc[:, list(FEATURES)]
+            for values in chunk.itertuples(index=False, name=None):
+                clean = {
+                    key: None if pd.isna(value) else value
+                    for key, value in zip(FEATURES, values, strict=True)
+                }
+                PredictRequest.model_validate(clean)
         logger.info(
             "current_contract_validation rows=%d dataframe_bytes=%d duration_ms=%d",
             len(frame),
