@@ -27,8 +27,7 @@ def scoring_frame(frame):
         "feature_preparation_batch_id",
         "feature_prepared_at",
     ):
-        result[name + "_min"] = result[name].iloc[0]
-        result[name + "_max"] = result[name].iloc[0]
+        result[name + "_consistent"] = True
         result[name + "_count"] = 2
     return result
 
@@ -45,6 +44,9 @@ def test_current_fixed_query_budgets_and_contract(scoring_frame):
     assert "`rome_transport`.`features`.`next_stop_delay_scoring`" in args[0]
     assert args[1] == {"requested_limit": 2}
     assert kwargs == {"max_rows": 2, "max_bytes": 8_000_000}
+    assert "MIN(`feature_contract_hash`) OVER () = MAX(`feature_contract_hash`) OVER ()" in args[0]
+    assert "AS feature_contract_hash_consistent" in args[0]
+    assert "AS feature_contract_hash_min" not in args[0]
 
 
 def test_population_validation_reaches_rows_after_first_chunk(scoring_frame):
@@ -79,7 +81,7 @@ def test_current_invalid_snapshot_fails_closed(scoring_frame, problem):
     elif problem == "grain":
         frame["grain_rows"] = 2
     elif problem == "lineage":
-        frame["source_silver_version_max"] = 2
+        frame["source_silver_version_consistent"] = False
     elif problem == "missing_lineage":
         frame["feature_prepared_at_count"] = 1
     elif problem == "future":
@@ -100,3 +102,17 @@ def test_invalid_limit_no_connection(limit):
     with pytest.raises(ValueError):
         CurrentScoringRepository(client, Settings(_env_file=None)).latest(limit)
     client.select.assert_not_called()
+
+
+@pytest.mark.parametrize("name", [
+    "feature_contract_hash", "source_silver_version",
+    "feature_preparation_batch_id", "feature_prepared_at",
+])
+@pytest.mark.parametrize("flag", [False, None, pd.NA])
+def test_compact_global_audit_flags_fail_closed(scoring_frame, name, flag):
+    source = scoring_frame.copy()
+    source[name + "_consistent"] = flag
+    client = Mock()
+    client.select.return_value = source
+    with pytest.raises(ValueError, match="Ambiguous snapshot lineage"):
+        CurrentScoringRepository(client, Settings(_env_file=None)).latest(2)

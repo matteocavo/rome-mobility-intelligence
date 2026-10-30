@@ -38,3 +38,18 @@ Target di margine: preferire RSS sotto 400 MiB; oltre 450 MiB richiede ulteriore
 analisi. Nessun successo sotto Windows equivale a una garanzia cgroup Linux.
 Se il servizio supera ancora il limite, lasciare la release bloccata e analizzare
 lo stage interessato; non aumentare automaticamente il piano o tagliare la popolazione.
+
+## Budget della popolazione dopo il primo deploy
+
+Sul commit `6a190af` health/ready sono tornati 200, ma la prima summary ha restituito
+503. I log hanno misurato un picco RSS di 407.052.288 byte, senza nuovo OOM.
+Una lettura locale con la stessa identita workload read-only ha riprodotto
+`ExportBudgetError`: 27.449 osservazioni restano sotto il cap righe, ma i valori
+MIN/MAX di lineage ripetuti su ogni riga superano il budget byte non compresso.
+
+Il follow-up mantiene 50.000 righe / 48.000.000 byte e le 47 feature. Restituisce
+COUNT e il flag globale `MIN = MAX` al posto dei lunghi valori MIN/MAX. I controlli
+restano sullo snapshot completo prima del LIMIT; i NULL falliscono tramite COUNT
+e flag mancanti/falsi falliscono lato applicazione. La verifica locale reale ha
+letto tutte le 27.449 righe in circa 24 s, con DataFrame finale di 24.867.664 byte.
+Anche questa correzione richiede verifica RSS nel runtime Render dopo il deploy.

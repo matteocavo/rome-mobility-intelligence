@@ -122,6 +122,13 @@ class DatabricksClient:
                     round((time.perf_counter() - started) * 1000),
                 )
                 return frame
+            except ExportBudgetError:
+                logger.warning(
+                    "databricks_failure stage=select category=databricks_export_budget "
+                    "elapsed_ms=%d",
+                    round((time.perf_counter() - started) * 1000),
+                )
+                raise
             except DataAccessError:
                 raise
             except Exception as error:
