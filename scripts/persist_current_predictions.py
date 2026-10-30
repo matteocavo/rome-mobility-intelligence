@@ -4,6 +4,7 @@ import json
 import os
 import re
 import socket
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -49,6 +50,9 @@ SAFE_CATEGORIES = frozenset(
         "unknown",
     }
 )
+SAFE_PATHS = frozenset(
+    {"/health", "/ready", "/predictions/current/persist?limit=100", "/predictions/history?limit=10"}
+)
 
 
 def classify_status(status):
@@ -74,16 +78,24 @@ def safe_stage(stage):
 
 
 def safe_category(category, status=None):
-    if category in SAFE_CATEGORIES:
+    if type(category) is str and category in SAFE_CATEGORIES:
         return category
-    return classify_status(0 if status is None else status)
+    return classify_status(safe_status(status))
+
+
+def safe_status(status):
+    return status if type(status) is int and (status == 0 or 100 <= status <= 599) else 0
+
+
+def safe_path(path):
+    return path if type(path) is str and path in SAFE_PATHS else None
 
 
 class OrchestrationError(RuntimeError):
     def __init__(self, stage, *, path=None, status=None, category=None):
         self.stage = safe_stage(stage)
-        self.path = path if type(path) is str else None
-        self.status = 0 if status is None else int(status)
+        self.path = safe_path(path)
+        self.status = safe_status(status)
         self.category = safe_category(category, self.status)
         super().__init__(f"Prediction orchestration failed: {self.stage}")
 
@@ -124,9 +136,9 @@ class Client:
     def _record_failure(self, stage, path, status, category=None):
         self.last_failure = {
             "stage": safe_stage(stage),
-            "path": path if type(path) is str else None,
-            "status": 0 if status is None else int(status),
-            "category": safe_category(category, 0 if status is None else int(status)),
+            "path": safe_path(path),
+            "status": safe_status(status),
+            "category": safe_category(category, safe_status(status)),
         }
 
     def request(self, path, *, method="GET", timeout=15):
@@ -185,6 +197,8 @@ class Client:
             raise OrchestrationError(
                 "transport", path=path, status=0, category="transport_error"
             ) from None
+        except OrchestrationError:
+            raise
         except Exception:
             raise OrchestrationError(
                 "response", path=path, status=0, category="response_parse_error"
@@ -192,6 +206,7 @@ class Client:
 
     def warm(self, path, predicate, stage, *, deadline=None):
         deadline = self.clock() + WARM_BUDGET if deadline is None else deadline
+        status = 0
         for attempt, delay in enumerate(WARM_DELAYS):
             remaining = deadline - self.clock()
             if remaining <= 0:
@@ -206,8 +221,8 @@ class Client:
                 self.sleep(delay)
             else:
                 break
-        self._record_failure(stage, path, 0)
-        raise OrchestrationError(stage, path=path, status=0)
+        self._record_failure(stage, path, status)
+        raise OrchestrationError(stage, path=path, status=status)
 
     def run(self, *, history=False):
         deadline = self.clock() + WARM_BUDGET
@@ -277,20 +292,13 @@ def main():
         print(json.dumps(client.run(history=os.environ.get("RMI_FETCH_HISTORY") == "true")))
     except OrchestrationError as error:
         detail = {
-            "stage": error.stage,
-            "path": error.path,
-            "status": error.status,
-            "category": error.category,
-        }
-        detail = {k: v for k, v in detail.items() if v is not None and v != 0 or k == "status"}
-        # Keep status even when it is 0 (connectivity) because 0 is meaningful here.
-        detail = {
-            "stage": error.stage,
-            "path": error.path,
-            "status": error.status,
-            "category": error.category,
+            "stage": safe_stage(error.stage),
+            "path": safe_path(error.path),
+            "status": safe_status(error.status),
+            "category": safe_category(error.category, safe_status(error.status)),
         }
         detail = {k: v for k, v in detail.items() if v is not None}
+        print(json.dumps(detail), file=sys.stderr)
         raise SystemExit(f"Prediction orchestration failed: {safe_stage(error.stage)}") from None
     except Exception:
         raise SystemExit("Prediction orchestration failed: internal") from None

@@ -39,6 +39,11 @@ function initialHistoryRecords(): HistoryRecord[] {
 
 export function App() {
   const [language, setLanguage] = useState<Language>('it');
+  const [freshnessNow, setFreshnessNow] = useState(Date.now());
+  useEffect(()=>{
+    const timer=setInterval(()=>setFreshnessNow(Date.now()),30000);
+    return ()=>clearInterval(timer);
+  },[]);
   const t = translations[language];
 
   const [activeSection, setActiveSection] = useState<string>('overview');
@@ -163,7 +168,8 @@ export function App() {
     } catch {
       if(active()){setBackendOnline(false);setError(true);}
     } finally {
-      if(active()){setLoading(false);setIsRefreshing(false);setIsWaking(false);setCurrentLoading(false);setCurrentAggregateLoading(false);}
+      if(attempt===liveGeneration.current){setLoading(false);setIsRefreshing(false);setIsWaking(false);}
+      if(active()){setCurrentLoading(false);setCurrentAggregateLoading(false);}
     }
     if(active())await fetchHistory(historyParams.current,background);
   },[language,fetchHistory]);
@@ -209,7 +215,7 @@ export function App() {
         {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{t.states.noCurrentData}</p>}
         <HeroOverview
           sourceWatermark={networkSummary?.source_watermark ?? ''}
-          sourceAgeSeconds={networkSummary?.source_watermark ? computeSourceAge(networkSummary.source_watermark) : NaN}
+          sourceAgeSeconds={networkSummary?.source_watermark ? computeSourceAge(networkSummary.source_watermark, freshnessNow) : NaN}
           predictionCount={networkSummary?.scored_count ?? null}
           majorCount={networkSummary?.major_delay_count ?? null}
           medianDelaySeconds={networkSummary?.median_observed_delay_seconds ?? NaN}

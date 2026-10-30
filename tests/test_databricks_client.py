@@ -67,6 +67,9 @@ def test_select_parameters_and_cleanup():
     cursor.close.assert_called_once()
     assert connect.call_args.kwargs["use_inline_params"] is False
     assert connect.call_args.kwargs["use_cloud_fetch"] is True
+    assert connect.call_args.kwargs["max_download_threads"] == 1
+    assert cursor.arraysize == 1000
+    assert cursor.buffer_size_bytes == 1_048_576
 
 
 def test_select_timing_log_has_only_safe_stages_and_aggregate_data(caplog):

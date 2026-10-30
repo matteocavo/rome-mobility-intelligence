@@ -19,6 +19,7 @@ from app.contracts.public import (
     page_response,
     probability_bins,
 )
+from app.core.memory_usage import log_memory
 from app.data.databricks_client import DataAccessError
 from app.services.public_summary import NetworkSummary, RouteRisk
 
@@ -79,7 +80,9 @@ class PublicPopulation:
             self._rows, self._summary, self._snapshot = [], None, None
             started = time.monotonic()
             source_started = time.perf_counter()
+            log_memory("source_start")
             frame = self.repository.population()
+            log_memory("source_ready")
             logger.info(
                 "public_population_source rows=%d dataframe_bytes=%d duration_ms=%d",
                 len(frame),
@@ -118,6 +121,7 @@ class PublicPopulation:
                 )
             if len(values) != len(frame) or not np.isfinite(values).all():
                 raise ValueError("Invalid current population probabilities")
+            log_memory("inference_ready")
             logger.info(
                 "public_population_inference rows=%d duration_ms=%d",
                 len(values),
@@ -256,6 +260,7 @@ class PublicPopulation:
             self._rows, self._summary = result, summary
             self._expires = time.monotonic() + 300
             self._snapshot = (self._rows, self._summary, self._expires)
+            log_memory("cache_ready")
             logger.info(
                 "public_population_cache rows=%d routes=%d duration_ms=%d total_ms=%d",
                 total,
@@ -265,6 +270,7 @@ class PublicPopulation:
             )
             return self._snapshot
         except Exception:
+            log_memory("failed")
             self._failed_until = time.monotonic() + 30
             raise
         finally:

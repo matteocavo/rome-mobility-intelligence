@@ -194,7 +194,11 @@ def test_main_logs_fixed_safe_stage_only(stage, monkeypatch, capsys):
     with pytest.raises(SystemExit) as error:
         module.main()
     assert str(error.value) == f"Prediction orchestration failed: {expected}"
-    assert capsys.readouterr() == ("", "")
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err) == {
+        "stage": expected, "status": 0, "category": "connectivity_or_timeout"
+    }
 
 
 def test_main_unexpected_exception_never_prints_raw_diagnostics(monkeypatch, capsys):

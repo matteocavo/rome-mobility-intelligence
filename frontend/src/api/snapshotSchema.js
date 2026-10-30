@@ -50,6 +50,7 @@ function validateSummary(summary) {
   if (summary.coverage !== 'current_scoring_population') return false;
   if (!Number.isInteger(summary.scored_count) || summary.scored_count <= 0) return false;
   if (!Number.isInteger(summary.route_count) || summary.route_count < 0) return false;
+  if (summary.route_count > summary.scored_count) return false;
   if (!summary.observed_delay_distribution || typeof summary.observed_delay_distribution !== 'object') return false;
   if (['early','minor','moderate','major','critical'].some((key) => !Number.isInteger(summary.observed_delay_distribution[key]) || summary.observed_delay_distribution[key] < 0)) return false;
   if (!validDate(summary.source_watermark) || !validDate(summary.query_generated_at)) return false;
@@ -62,12 +63,14 @@ function validateCurrent(current) {
   if (current.coverage !== 'current_scoring_population') return false;
   if (!Array.isArray(current.items) || current.items.length === 0) return false;
   if (!Number.isInteger(current.total) || current.total < current.items.length) return false;
-  if (!Number.isInteger(current.page) || current.page < 1) return false;
+  if (current.page !== 1) return false;
   if (![10,20,50].includes(current.page_size)) return false;
-  if (!Number.isInteger(current.total_pages) || current.total_pages < 1) return false;
-  if (!validDate(current.source_watermark ?? current.items[0]?.source_watermark) || !validDate(current.population_generated_at ?? current.query_generated_at)) return false;
-  if (!notFuture(current.source_watermark ?? current.items[0]?.source_watermark) || !notFuture(current.population_generated_at ?? current.query_generated_at)) return false;
-  if (!current.items.every((row) => !row.prediction_generated_at || validDate(row.prediction_generated_at))) return false;
+  if (current.items.length > current.page_size || current.total_pages !== Math.ceil(current.total / current.page_size)) return false;
+  const generated = current.population_generated_at ?? current.query_generated_at;
+  if (!notFuture(current.source_watermark) || !notFuture(generated)) return false;
+  if (Date.parse(current.source_watermark) > Date.parse(generated)) return false;
+  if (!current.items.every((row) => row.source_watermark === current.source_watermark &&
+      (!row.prediction_generated_at || (notFuture(row.prediction_generated_at) && row.prediction_generated_at === generated)))) return false;
   try {
     const parsed = parseRows({ ...current, predictions: current.items });
     if (parsed.length !== current.items.length) return false;
@@ -79,6 +82,9 @@ function validateHistory(history) {
   if (!isRecord(history)) return false;
   if (history.coverage !== 'persisted_prediction_history') return false;
   if (!Array.isArray(history.items)) return false;
+  if (!Number.isInteger(history.total) || history.total < history.items.length || history.page !== 1 ||
+      ![10,20,50].includes(history.page_size) || history.items.length > history.page_size ||
+      history.total_pages !== Math.max(1, Math.ceil(history.total / history.page_size))) return false;
   if (!validDate(history.query_generated_at)) return false;
   if (!notFuture(history.query_generated_at)) return false;
   if (history.items.length > 0) {
@@ -93,11 +99,12 @@ function validateHistory(history) {
 export function validateSnapshot(raw) {
   if (!isRecord(raw)) return null;
   if (raw.version !== 1) return null;
-  if (raw.capturedAt !== undefined && !validDate(raw.capturedAt)) return null;
+  if (raw.capturedAt !== undefined && !notFuture(raw.capturedAt)) return null;
   if (!validateSummary(raw.summary)) return null;
   if (!validateCurrent(raw.current)) return null;
-  if (raw.summary?.source_watermark && raw.current?.source_watermark && raw.summary.source_watermark !== raw.current.source_watermark) return null;
-  if (Number.isInteger(raw.summary?.scored_count) && Number.isInteger(raw.current?.total) && raw.current.total !== raw.summary.scored_count && raw.current.total > raw.current.items.length) return null;
+  if (raw.summary.source_watermark !== raw.current.source_watermark) return null;
+  if (raw.summary.scored_count !== raw.current.total) return null;
+  if (raw.summary.query_generated_at !== (raw.current.population_generated_at ?? raw.current.query_generated_at)) return null;
   if (raw.history !== undefined && !validateHistory(raw.history)) return null;
   if (raw.currentAggregate !== undefined) { try { parseAggregate(raw.currentAggregate, 'current_scoring_population'); } catch { return null; } }
   if (raw.historyAggregate !== undefined) { try { parseAggregate(raw.historyAggregate, 'persisted_prediction_history'); } catch { return null; } }

@@ -300,7 +300,7 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
-      liveApi: 'Ultimo snapshot disponibile',
+      liveApi: 'Ultimi dati disponibili',
       demoData: 'Dati dimostrativi',
       wakingService: 'Avvio del servizio dati…',
       connectingData: 'Connessione agli ultimi dati disponibili…',
@@ -379,7 +379,7 @@ export const translations: Record<Language, Translations> = {
       p90Delay: 'Ritardi più gravi',
       p90DelaySub: 'P90 del ritardo osservato',
       dataFreshness: 'Ultimo aggiornamento',
-      dataFreshnessSub: 'Freschezza dello snapshot',
+      dataFreshnessSub: 'Freschezza dei dati',
       highRiskBadge: 'Criticità',
       nominalBadge: 'Regolare',
       freshBadge: 'Recente',
@@ -387,7 +387,7 @@ export const translations: Record<Language, Translations> = {
     },
     currentSituation: {
       title: 'Situazione attuale',
-      subtitle: 'Puntualità e stima del rischio di ritardo sulle osservazioni trip × fermata dell’ultimo snapshot disponibile.',
+      subtitle: 'Puntualità e stima del rischio di ritardo sulle ultime osservazioni trip × fermata disponibili.',
       filterMode: 'Modalità:',
       severityFilter: {
         all: 'Tutti gli stati',
@@ -641,7 +641,7 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
-      liveApi: 'Latest available snapshot',
+      liveApi: 'Latest available data',
       demoData: 'Synthetic data',
       wakingService: 'Waking data service…',
       connectingData: 'Connecting to latest data…',
@@ -720,7 +720,7 @@ export const translations: Record<Language, Translations> = {
       p90Delay: 'Worst delays',
       p90DelaySub: 'P90 observed delay',
       dataFreshness: 'Last updated',
-      dataFreshnessSub: 'Snapshot freshness',
+      dataFreshnessSub: 'Data freshness',
       highRiskBadge: 'Critical',
       nominalBadge: 'Normal',
       freshBadge: 'Fresh',
@@ -728,7 +728,7 @@ export const translations: Record<Language, Translations> = {
     },
     currentSituation: {
       title: 'Current Situation',
-      subtitle: 'Punctuality and estimated major-delay risk over the trip × stop observations of the latest available snapshot.',
+      subtitle: 'Punctuality and estimated major-delay risk over the latest available trip × stop observations.',
       filterMode: 'Mode:',
       severityFilter: {
         all: 'All statuses',

@@ -131,12 +131,12 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <div
                 className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]"
-                title={(!backendOnline || isFallback) ? (isFallback ? 'Dataset operativo di riferimento' : t.status.wakingService) : (language === 'it' ? 'Lettura API pubblica' : 'Public API read')}
+                title={!backendOnline ? (unavailable ? t.states.unavailable : t.status.connectingData) : (language === 'it' ? 'Lettura API pubblica' : 'Public API read')}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
                 ></span>
-                <span>{(!backendOnline || isFallback) ? (isFallback ? t.status.demoData : t.status.wakingService) : t.status.liveApi}</span>
+                <span>{t.status.liveApi}</span>
               </div>
             )}
 
@@ -220,7 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span
                 className={`w-1.5 h-1.5 rounded-full ${(!backendOnline || isFallback) ? 'bg-[#FFB300]' : 'bg-[#10B981]'}`}
               ></span>
-              <span>{(!backendOnline || isFallback) ? (isFallback ? t.status.demoData : t.status.wakingService) : t.status.liveApi}</span>
+              <span>{t.status.liveApi}</span>
             </span>
             <span>{t.status.preRelease}</span>
           </div>

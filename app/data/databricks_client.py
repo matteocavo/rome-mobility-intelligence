@@ -171,6 +171,9 @@ class DatabricksClient:
                     http_path=cfg.databricks_http_path,
                     credentials_provider=credentials,
                     use_cloud_fetch=True,
+                    # Default CloudFetch prefetches up to ten files concurrently.
+                    # Bound transport buffers before allocating pandas/model data.
+                    max_download_threads=1,
                     use_inline_params=False,
                     session_configuration={
                         "STATEMENT_TIMEOUT": str(math.ceil(cfg.databricks_query_timeout_seconds))
@@ -183,10 +186,10 @@ class DatabricksClient:
         ):
             connection_ms = round((time.perf_counter() - connection_started) * 1000)
             attach(cursor)
-            if compact_strings:
-                # fetchmany(1000) alone does not bound the connector's internal
-                # direct-result buffer (default arraysize is 10,000).
-                cursor.arraysize = 1000
+            # fetchmany alone does not bound the SDK's default 100 MiB buffer.
+            # CloudFetch remains enabled; these are transport, not population limits.
+            cursor.arraysize = 1000
+            cursor.buffer_size_bytes = 1_048_576
             stage_started = time.perf_counter()
             cursor.execute("SELECT current_user() AS workload_identity")
             identity = cursor.fetchone()
