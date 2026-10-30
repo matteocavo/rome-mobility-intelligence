@@ -108,7 +108,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
         rate: (data.major / data.total) * 100,
       }))
       .sort((a, b) => b.rate - a.rate)
-      .slice(0, 8);
+      .slice(0, 7);
   }, [predictions]);
 
   // Initialize Map
