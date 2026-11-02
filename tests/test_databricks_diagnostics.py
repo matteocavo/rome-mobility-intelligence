@@ -6,7 +6,7 @@ import pytest
 from databricks.sql.exc import ProgrammingError, RequestError
 
 from app.core.config import Settings
-from app.core.databricks_diagnostics import failure_category
+from app.core.databricks_diagnostics import failure_category, failure_metadata
 from app.core.workload_auth import WorkloadAuthenticationError, exchange_token
 from app.data.databricks_client import DataAccessError, DatabricksClient
 from app.services.batch_scoring import BatchScoringService
@@ -54,6 +54,31 @@ def test_connection_failure_log_and_exception_are_sanitized(caplog):
     assert "databricks_authorization" in caplog.text
     assert PRIVATE not in caplog.text + str(caught.value)
     assert "fixture.cloud.databricks.com" not in caplog.text
+
+
+def test_open_session_bad_request_stays_unknown_but_has_safe_metadata(caplog):
+    error = RequestError(PRIVATE, {
+        "http-code": 400, "method": "OpenSession", "error-message": PRIVATE,
+        "session-id": PRIVATE, "query-id": PRIVATE,
+    })
+    assert failure_category(error) == "databricks_unknown"
+    with caplog.at_level(logging.WARNING), pytest.raises(DataAccessError):
+        DatabricksClient(configured(), Mock(side_effect=error)).select("SELECT 1", max_rows=1)
+    assert "http_status=400 rpc=open_session" in caplog.text
+    assert PRIVATE not in caplog.text
+
+
+@pytest.mark.parametrize("value", [PRIVATE, {}, [], True, None, 999])
+def test_metadata_rejects_untrusted_values(value):
+    error = RequestError(PRIVATE, {"http-code": value, "method": value})
+    assert failure_metadata(error) == (0, "unknown")
+
+
+def test_metadata_walks_bounded_nested_context_and_cycles():
+    inner = RequestError(PRIVATE, {"http-code": 503, "method": "ExecuteStatement"})
+    outer = RequestError(PRIVATE, {"original-exception": inner})
+    inner.__cause__ = outer
+    assert failure_metadata(outer) == (503, "execute_statement")
 
 
 @pytest.mark.parametrize("status,category", [

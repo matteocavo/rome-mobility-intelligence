@@ -100,3 +100,31 @@ def test_warm_exhaustion_preserves_last_http_status():
         client.warm("/ready", lambda _: False, "ready")
     assert failure.value.status == 503
     assert client.last_failure["status"] == 503
+
+
+def test_attempt_diagnostics_preserve_failure_and_bounded_retry(capsys):
+    from tests.test_actions_scheduler import READY, client_with
+
+    client = client_with([(200, {"status": "ok"}), (200, READY), *[(503, None)] * 3])
+    with pytest.raises(OrchestrationError) as failure:
+        client.run()
+    assert failure.value.status == 503
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
+    assert [event["attempt"] for event in events] == [1, 2, 3]
+    assert [event["retry_delay_seconds"] for event in events] == [30, 60, 0]
+    assert all(event["category"] == "server_unavailable_or_timeout" for event in events)
+    assert all(set(event) == {
+        "stage", "attempt", "status", "category", "elapsed_ms", "retry_delay_seconds",
+    } for event in events)
+
+
+def test_attempt_diagnostics_stop_after_eventual_idempotent_success(capsys):
+    from tests.test_actions_scheduler import READY, SUMMARY, client_with
+
+    client = client_with([
+        (200, {"status": "ok"}), (200, READY), (503, None), (200, SUMMARY),
+    ])
+    assert client.run()["status"] == "success_idempotent"
+    events = [json.loads(line) for line in capsys.readouterr().err.splitlines()]
+    assert [event["status"] for event in events] == [503, 200]
+    assert events[-1]["retry_delay_seconds"] == 0
