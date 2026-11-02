@@ -31,8 +31,19 @@ HTTP 400 / `databricks_unknown`; the subsequent warehouse metadata GET returned
 HTTP 200 and STOPPED. This independently proves that local M2M authentication
 and warehouse metadata access work. It does **not** prove that the production
 failures have exactly that HTTP status or that Free quota caused the 400.
-No query reached scoring, no rows were persisted by these probes, and no
-warehouse Start/Stop/configuration API was called explicitly.
+No rows were persisted by these initial probes and no warehouse Start/Stop API
+was called at that stage.
+
+### Controlled recovery experiment
+
+After explicit user approval of **one** Start request, the existing warehouse
+Start API returned 200, its state became RUNNING, and the same local `SELECT 1`
+succeeded. Production then returned `/health` 200 after a 52.44-second wake and
+`/public/summary` 200 in 43.28 seconds. No persistence POST was sent by this
+experiment. This establishes a viable state-dependent recovery for the observed
+failure. The reason the platform did not auto-start on the earlier OpenSession
+request remains unknown; the exact HTTP status of those past production failures
+cannot be retroactively proven from their category-only logs.
 
 ## What this patch changes
 
@@ -45,6 +56,15 @@ warehouse Start/Stop/configuration API was called explicitly.
   are emitted by these additions.
 - Tests cover unknown 400, nested connector contexts, invalid metadata, bounded
   retries and eventual idempotent success.
+- Opt-in `DATABRICKS_WAREHOUSE_WAKE_ENABLED` (default false) enables a narrowly
+  guarded recovery: only after OpenSession HTTP 400, read the existing configured
+  warehouse state; only if STOPPED request one Start; if already STARTING only
+  wait; allow at most 60 seconds and one reconnect. Other states, authentication,
+  authorization, unrelated 400s and non-warehouse paths cannot trigger Start.
+- Recovery remains within the original SELECT concurrency gate and application
+  deadline. It uses the same workload identity, fixed existing warehouse and
+  existing CAN USE grant. There is no compute provisioning, grant/config/schema
+  change or new credential in Actions. If recovery fails, persistence still fails.
 
 ## Policy intentionally unchanged pending evidence
 
@@ -60,11 +80,13 @@ evidence yet that a different offset or more aggressive retry policy fixes the
 current OpenSession rejection. A daily quota exhaustion would not be cured by
 several more retries in the same window either.
 
-Do not merge or deploy this as a proven reliability fix. First obtain the
-warehouse health/activity explanation or equivalent safe upstream evidence.
-Then choose a targeted configuration correction or bounded delayed retry policy
-only for proven transient failures; authentication/authorization and permanent
-request/configuration errors must not be blindly retried.
+This remains a candidate fix, not a demonstrated scheduled reliability result.
+The opt-in must not be enabled without approval for automatic starts; the user's
+one-time diagnostic Start authorization does not imply repeated future starts.
+The schedule offset and generic retry timings are unchanged because neither is
+proven responsible. Authentication/authorization and permanent errors must not
+be blindly retried. A Free compute quota rejection still cannot be solved by a
+wake request and must remain a visible failure.
 
 ## Production acceptance still required
 
@@ -74,9 +96,10 @@ subsequent scheduled success, natural-key idempotence, unchanged snapshot/live
 semantics and Render memory. No patch release is recommended on diagnostics
 alone. The current incident is not declared resolved.
 
-Local verification: 92 targeted tests passed (Actions scheduler, persistence,
-Databricks diagnostics and persistence diagnostics), Ruff, compileall,
-repository policy and diff checks passed. The full local suite stalled after
-13% and was interrupted; no full-suite PASS is claimed. Linux CI remains a
-separate required check. Production verification has not been performed for
-this patch and no production reliability claim follows from these unit tests.
+Local verification: 141 targeted tests passed (warehouse wake, Actions scheduler,
+persistence, Databricks client/diagnostics, query budget and persistence
+diagnostics); Ruff passed. The first diagnostics-only revision passed Linux CI:
+536 tests, 2 skipped, 26 subtests, plus frontend, ARM64 and Docker smoke. Its full
+local suite had stalled after 13% and was interrupted. The subsequent opt-in wake
+revision requires its own CI result. No deployment or production reliability
+claim follows from these unit tests. No tags/releases were changed.

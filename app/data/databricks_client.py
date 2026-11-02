@@ -15,6 +15,7 @@ from app.core.config import Settings
 from app.core.databricks_diagnostics import failure_category, failure_metadata
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 from app.data.query_budget import QueryCapacityExceeded, QueryDeadlineExceeded, execute_bounded
+from app.data.warehouse_wake import recover_stopped_warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -175,15 +176,14 @@ class DatabricksClient:
         fetch_complete_ms = conversion_ms = 0
         first_batch_recorded = False
         fetch_started = None
-        with (
-            closing(
-                connect(
+
+        def open_connection():
+            def attempt():
+                return connect(
                     server_hostname=cfg.databricks_server_hostname,
                     http_path=cfg.databricks_http_path,
                     credentials_provider=credentials,
                     use_cloud_fetch=True,
-                    # Default CloudFetch prefetches up to ten files concurrently.
-                    # Bound transport buffers before allocating pandas/model data.
                     max_download_threads=1,
                     use_inline_params=False,
                     session_configuration={
@@ -192,6 +192,25 @@ class DatabricksClient:
                     _socket_timeout=min(cfg.databricks_query_timeout_seconds, 15),
                     _retry_stop_after_attempts_count=1,
                 )
+
+            try:
+                return attempt()
+            except Exception as error:
+                if (
+                    not cfg.databricks_warehouse_wake_enabled
+                    or failure_metadata(error) != (400, "open_session")
+                ):
+                    raise
+                if not recover_stopped_warehouse(cfg, credentials, cancelled):
+                    raise
+                if cancelled.is_set():
+                    raise QueryDeadlineExceeded("Query cancelled before reconnect") from None
+                # Exactly one reconnect, under the original query gate/deadline.
+                return attempt()
+
+        with (
+            closing(
+                open_connection()
             ) as connection,
             closing(connection.cursor()) as cursor,
         ):
