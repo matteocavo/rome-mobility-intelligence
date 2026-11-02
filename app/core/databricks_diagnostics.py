@@ -12,6 +12,31 @@ CATEGORIES = frozenset({
 })
 
 
+def failure_metadata(error):
+    """Fixed RPC name and numeric HTTP status; never export connector context."""
+    pending, seen = [error], set()
+    status, rpc = 0, "unknown"
+    methods = {"OpenSession": "open_session", "ExecuteStatement": "execute_statement",
+               "FetchResults": "fetch_results", "CloseSession": "close_session"}
+    while pending and len(seen) < 8:
+        item = pending.pop(0)
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
+        context = getattr(item, "context", {})
+        context = context if isinstance(context, dict) else {}
+        code = item.code if isinstance(item, urllib.error.HTTPError) else context.get("http-code")
+        if not status and type(code) is int and 100 <= code <= 599:
+            status = code
+        method = context.get("method")
+        if rpc == "unknown" and type(method) is str:
+            rpc = methods.get(method, "unknown")
+        for nested in (context.get("original-exception"), item.__cause__, item.__context__):
+            if isinstance(nested, BaseException):
+                pending.append(nested)
+    return status, rpc
+
+
 def failure_category(error):
     """Inspect known connector metadata/chains but return only an allowlisted constant."""
     pending, seen = [error], set()

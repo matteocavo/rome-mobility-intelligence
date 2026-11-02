@@ -240,9 +240,18 @@ class Client:
             deadline=deadline,
         )
         for attempt, delay in enumerate((30, 60, 0)):
+            started = self.clock()
             status, data = self.request(
                 "/predictions/current/persist?limit=100", method="POST", timeout=140
             )
+            # No upstream body/header, URL, key or exception text in Actions logs.
+            print(json.dumps({
+                "stage": "persistence", "attempt": attempt + 1,
+                "status": safe_status(status),
+                "category": "success" if status == 200 else classify_status(status),
+                "elapsed_ms": max(0, round((self.clock() - started) * 1000)),
+                "retry_delay_seconds": delay if status in {0, 503, 504} else 0,
+            }), file=sys.stderr)
             if status == 200:
                 values = [data.get(k) for k in ("rows_evaluated", "rows_inserted", "rows_existing")]
                 if (
