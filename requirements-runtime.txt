@@ -26,7 +26,7 @@ pyarrow==26.0.0
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pybreaker==1.4.1
-pydantic==2.14.1
+pydantic==2.14.2
 pydantic-core==2.50.1
 pydantic-settings==2.16.1
 pyjwt==2.15.1
