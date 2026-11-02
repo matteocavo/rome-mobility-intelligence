@@ -27,7 +27,7 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 pybreaker==1.4.1
 pydantic==2.14.1
-pydantic-core==2.50.1
+pydantic-core==2.50.2
 pydantic-settings==2.16.1
 pyjwt==2.15.1
 python-dateutil==2.9.0.post0
