@@ -12,7 +12,7 @@ import sqlglot
 from sqlglot import exp
 
 from app.core.config import Settings
-from app.core.databricks_diagnostics import failure_category, failure_metadata
+from app.core.databricks_diagnostics import failure_metadata, log_failure
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 from app.data.query_budget import QueryCapacityExceeded, QueryDeadlineExceeded, execute_bounded
 from app.data.warehouse_wake import recover_stopped_warehouse
@@ -133,16 +133,10 @@ class DatabricksClient:
             except DataAccessError:
                 raise
             except Exception as error:
-                category = failure_category(error)
-                http_status, rpc = failure_metadata(error)
-                logger.warning(
-                    "databricks_failure stage=select category=%s "
-                    "http_status=%d rpc=%s elapsed_ms=%d",
-                    category,
-                    http_status,
-                    rpc,
-                    round((time.perf_counter() - started) * 1000),
-                )
+                if not getattr(error, "_rmi_failure_logged", False):
+                    log_failure(
+                        logger, error, "select", round((time.perf_counter() - started) * 1000),
+                    )
                 raise DataAccessError("Databricks SELECT failed; diagnostics suppressed") from None
 
         try:
@@ -178,23 +172,33 @@ class DatabricksClient:
         fetch_started = None
 
         def open_connection():
-            def attempt():
-                return connect(
-                    server_hostname=cfg.databricks_server_hostname,
-                    http_path=cfg.databricks_http_path,
-                    credentials_provider=credentials,
-                    use_cloud_fetch=True,
-                    max_download_threads=1,
-                    use_inline_params=False,
-                    session_configuration={
-                        "STATEMENT_TIMEOUT": str(math.ceil(cfg.databricks_query_timeout_seconds))
-                    },
-                    _socket_timeout=min(cfg.databricks_query_timeout_seconds, 15),
-                    _retry_stop_after_attempts_count=1,
-                )
+            def attempt(number):
+                started = time.perf_counter()
+                try:
+                    return connect(
+                        server_hostname=cfg.databricks_server_hostname,
+                        http_path=cfg.databricks_http_path,
+                        credentials_provider=credentials,
+                        use_cloud_fetch=True,
+                        max_download_threads=1,
+                        use_inline_params=False,
+                        session_configuration={
+                            "STATEMENT_TIMEOUT": str(
+                                math.ceil(cfg.databricks_query_timeout_seconds)
+                            )
+                        },
+                        _socket_timeout=min(cfg.databricks_query_timeout_seconds, 15),
+                        _retry_stop_after_attempts_count=1,
+                    )
+                except Exception as error:
+                    log_failure(
+                        logger, error, "session_open",
+                        round((time.perf_counter() - started) * 1000), attempt=number,
+                    )
+                    raise
 
             try:
-                return attempt()
+                return attempt(1)
             except Exception as error:
                 if (
                     not cfg.databricks_warehouse_wake_enabled
@@ -206,7 +210,7 @@ class DatabricksClient:
                 if cancelled.is_set():
                     raise QueryDeadlineExceeded("Query cancelled before reconnect") from None
                 # Exactly one reconnect, under the original query gate/deadline.
-                return attempt()
+                return attempt(2)
 
         with (
             closing(
