@@ -70,7 +70,7 @@ def test_other_states_never_trigger_start(state):
     assert result is False and opener.open.call_count == 1
 
 
-def test_wake_budget_exhaustion_still_fails_without_additional_starts():
+def test_wake_budget_exhaustion_still_fails_without_additional_starts(caplog):
     clock, opener = FakeClock(), opener_for([{"state": "STARTING"}] * 20)
     with pytest.raises(TimeoutError):
         recover_stopped_warehouse(
@@ -79,6 +79,9 @@ def test_wake_budget_exhaustion_still_fails_without_additional_starts():
         )
     assert clock.now <= 60
     assert all(call.args[0].method == "GET" for call in opener.open.call_args_list)
+    assert "operation=warehouse_poll category=databricks_timeout" in caplog.text
+    assert "http_status=0 rpc=unknown" in caplog.text
+    assert "warehouse_state=STARTING" in caplog.text
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 429, 503, 504])
@@ -172,3 +175,102 @@ def test_no_reconnect_when_warehouse_cannot_be_recovered(monkeypatch):
         DatabricksClient(settings(), connect).select("SELECT 1", max_rows=1)
     connect.assert_called_once()
     wake.assert_called_once()
+
+
+@pytest.mark.parametrize("operation,states,methods,state", [
+    ("warehouse_get", [], ["GET"], "unknown"),
+    ("warehouse_start", [{"state": "STOPPED"}], ["GET", "POST"], "STOPPED"),
+    ("warehouse_poll", [{"state": "STOPPED"}, {}], ["GET", "POST", "GET"], "STOPPED"),
+])
+@pytest.mark.parametrize("status", [400, 401, 403, 429, 503, 504])
+def test_recovery_rejection_keeps_its_own_operation_and_initial_session_error(
+    monkeypatch, caplog, operation, states, methods, state, status,
+):
+    clock = FakeClock()
+    opener = opener_for(states)
+    rejection = urllib.error.HTTPError(
+        "https://private.invalid", status, PRIVATE, {"Authorization": PRIVATE},
+        io.BytesIO(json.dumps({"error_code": "INVALID_STATE", "message": PRIVATE}).encode()),
+    )
+    opener.open.side_effect = [*opener.open.side_effect, rejection]
+    monkeypatch.setattr(
+        "app.core.workload_auth.WorkloadCredentials.headers",
+        lambda self: {"Authorization": "Bearer " + PRIVATE},
+    )
+    # Replace only waiting; the same recovery implementation and request sequence run.
+    from app.data.warehouse_wake import recover_stopped_warehouse as actual_recover
+
+    def bounded_recover(cfg, credentials, cancelled):
+        return actual_recover(
+            cfg, credentials, cancelled, opener=opener, clock=clock, sleep=clock.sleep,
+        )
+
+    monkeypatch.setattr("app.data.databricks_client.recover_stopped_warehouse", bounded_recover)
+    initial = RequestError(PRIVATE, {"http-code": 400, "method": "OpenSession"})
+    connect = Mock(side_effect=initial)
+    with caplog.at_level(logging.WARNING), pytest.raises(DataAccessError) as caught:
+        DatabricksClient(settings(), connect).select("SELECT 1", max_rows=1)
+    events = [r.message for r in caplog.records if r.message.startswith("databricks_failure ")]
+    assert len(events) == 2
+    assert "operation=session_open" in events[0]
+    assert "http_status=400 rpc=open_session" in events[0]
+    assert "attempt=1" in events[0]
+    assert f"operation={operation}" in events[1]
+    assert f"http_status={status} rpc=unknown" in events[1]
+    assert "error_code=INVALID_STATE" in events[1]
+    assert f"warehouse_state={state}" in events[1]
+    assert "elapsed_ms=0" in events[1]
+    assert PRIVATE not in caplog.text + str(caught.value)
+    assert "private.invalid" not in caplog.text
+    assert "0123456789abcdef" not in caplog.text
+    assert "SELECT 1" not in caplog.text
+    assert [c.args[0].method for c in opener.open.call_args_list] == methods
+    connect.assert_called_once()
+    assert clock.delays == ([5] if operation == "warehouse_poll" else [])
+
+
+def test_reconnected_session_failure_is_separate_without_duplicate_select_log(monkeypatch, caplog):
+    initial = RequestError(PRIVATE, {"http-code": 400, "method": "OpenSession"})
+    final = RequestError(PRIVATE, {"http-code": 403, "method": "OpenSession"})
+    connect = Mock(side_effect=[initial, final])
+    wake = Mock(return_value=True)
+    monkeypatch.setattr("app.data.databricks_client.recover_stopped_warehouse", wake)
+    with caplog.at_level(logging.WARNING), pytest.raises(DataAccessError):
+        DatabricksClient(settings(), connect).select("SELECT 1", max_rows=1)
+    events = [r.message for r in caplog.records if r.message.startswith("databricks_failure ")]
+    assert len(events) == 2
+    assert "http_status=400 rpc=open_session" in events[0] and "attempt=1" in events[0]
+    assert "http_status=403 rpc=open_session" in events[1] and "attempt=2" in events[1]
+    assert "category=databricks_authorization" in events[1]
+    assert all("operation=session_open" in event for event in events)
+    assert connect.call_count == 2
+    wake.assert_called_once()
+
+
+def test_actual_recovery_preserves_requests_and_connection_options(monkeypatch, caplog):
+    clock = FakeClock()
+    opener = opener_for([{"state": "STOPPED"}, {}, {"state": "RUNNING"}])
+    monkeypatch.setattr("app.core.workload_auth.WorkloadCredentials.headers", lambda self: {})
+
+    def bounded_recover(cfg, credentials, cancelled):
+        return recover_stopped_warehouse(
+            cfg, credentials, cancelled, opener=opener, clock=clock, sleep=clock.sleep,
+        )
+
+    monkeypatch.setattr("app.data.databricks_client.recover_stopped_warehouse", bounded_recover)
+    initial = RequestError(PRIVATE, {"http-code": 400, "method": "OpenSession"})
+    connect = Mock(side_effect=[initial, successful_connection()])
+    with caplog.at_level(logging.INFO):
+        frame = DatabricksClient(settings(), connect).select("SELECT 1 AS probe", max_rows=1)
+    assert len(frame) == 1 and connect.call_count == 2
+    assert connect.call_args_list[0].kwargs == connect.call_args_list[1].kwargs
+    assert connect.call_args.kwargs["_retry_stop_after_attempts_count"] == 1
+    assert connect.call_args.kwargs["_socket_timeout"] == 15
+    assert connect.call_args.kwargs["session_configuration"] == {"STATEMENT_TIMEOUT": "120"}
+    assert [c.args[0].method for c in opener.open.call_args_list] == ["GET", "POST", "GET"]
+    assert all(c.kwargs["timeout"] == 10 for c in opener.open.call_args_list)
+    assert clock.delays == [5]
+    events = [r.message for r in caplog.records if r.message.startswith("databricks_failure ")]
+    assert len(events) == 1 and "operation=session_open" in events[0]
+    assert "stage=running" in caplog.text
+    assert PRIVATE not in caplog.text

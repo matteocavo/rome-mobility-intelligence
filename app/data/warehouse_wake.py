@@ -6,6 +6,7 @@ import re
 import time
 import urllib.request
 
+from app.core.databricks_diagnostics import WAREHOUSE_STATES, log_failure
 from app.core.workload_auth import NoRedirect
 
 logger = logging.getLogger(__name__)
@@ -28,39 +29,63 @@ def recover_stopped_warehouse(
         + "/api/2.0/sql/warehouses/" + match[1]
     )
     opener = opener or urllib.request.build_opener(NoRedirect())
-    deadline = clock() + WAKE_BUDGET_SECONDS
+    started = clock()
+    deadline = started + WAKE_BUDGET_SECONDS
 
-    def request(method, suffix=""):
-        remaining = deadline - clock()
-        if cancelled.is_set() or remaining <= 0:
-            raise TimeoutError("Warehouse wake deadline expired")
-        req = urllib.request.Request(
-            base + suffix, method=method,
-            data=b"{}" if method == "POST" else None,
-            headers={**credentials.headers(), "Content-Type": "application/json"},
-        )
-        with opener.open(req, timeout=min(10, remaining)) as response:
-            payload = response.read(65537)
-            if len(payload) > 65536:
-                raise ValueError("Invalid warehouse metadata")
-            value = json.loads(payload)
-            if not isinstance(value, dict):
-                raise ValueError("Invalid warehouse metadata")
-            return value
+    state = "unknown"
 
-    state = request("GET").get("state")
+    def request(method, operation, suffix=""):
+        started = clock()
+        try:
+            remaining = deadline - clock()
+            if cancelled.is_set() or remaining <= 0:
+                raise TimeoutError("Warehouse wake deadline expired")
+            req = urllib.request.Request(
+                base + suffix, method=method,
+                data=b"{}" if method == "POST" else None,
+                headers={**credentials.headers(), "Content-Type": "application/json"},
+            )
+            with opener.open(req, timeout=min(10, remaining)) as response:
+                payload = response.read(65537)
+                if len(payload) > 65536:
+                    raise ValueError("Invalid warehouse metadata")
+                value = json.loads(payload)
+                if not isinstance(value, dict):
+                    raise ValueError("Invalid warehouse metadata")
+                return value
+        except Exception as error:
+            log_failure(
+                logger, error, operation, round((clock() - started) * 1000),
+                warehouse_state=state,
+            )
+            raise
+
+    state = request("GET", "warehouse_get").get("state")
     if state not in {"STOPPED", "STARTING"}:
+        logger.info(
+            "databricks_warehouse_wake stage=not_recoverable operation=warehouse_get "
+            "warehouse_state=%s", state if state in WAREHOUSE_STATES else "unknown",
+        )
         return False
     if state == "STOPPED":
-        request("POST", "/start")
+        request("POST", "warehouse_start", "/start")
         logger.info("databricks_warehouse_wake stage=start_requested")
     # A STARTING warehouse is observed, never issued another start request.
     while not cancelled.is_set() and deadline - clock() > 5:
         sleep(5)
-        state = request("GET").get("state")
+        state = request("GET", "warehouse_poll").get("state")
         if state == "RUNNING":
             logger.info("databricks_warehouse_wake stage=running")
             return True
         if state != "STARTING":
+            logger.info(
+                "databricks_warehouse_wake stage=not_recoverable operation=warehouse_poll "
+                "warehouse_state=%s", state if state in WAREHOUSE_STATES else "unknown",
+            )
             return False
-    raise TimeoutError("Warehouse wake deadline expired")
+    error = TimeoutError("Warehouse wake deadline expired")
+    log_failure(
+        logger, error, "warehouse_poll", round((clock() - started) * 1000),
+        warehouse_state=state,
+    )
+    raise error
