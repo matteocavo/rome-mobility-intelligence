@@ -20,6 +20,7 @@ import {
 import { api, parseRows } from './api/client';
 // @ts-ignore
 import { validateSnapshot, sourceAgeSeconds as computeSourceAge } from './api/snapshotSchema.js';
+import { classifyFreshness, nextFreshnessCheck, type DataSource } from './api/freshness.js';
 import { DOCUMENTED_MODEL_INFO } from './api/modelInfo';
 import bundledSnapshotRaw from './data/snapshot.json';
 import { Language, translations } from './i18n/translations';
@@ -40,10 +41,6 @@ function initialHistoryRecords(): HistoryRecord[] {
 export function App() {
   const [language, setLanguage] = useState<Language>('it');
   const [freshnessNow, setFreshnessNow] = useState(Date.now());
-  useEffect(()=>{
-    const timer=setInterval(()=>setFreshnessNow(Date.now()),30000);
-    return ()=>clearInterval(timer);
-  },[]);
   const t = translations[language];
 
   const [activeSection, setActiveSection] = useState<string>('overview');
@@ -63,6 +60,25 @@ export function App() {
   const [sourceAgeSeconds, setSourceAgeSeconds] = useState<number>(initialSnapshot?.summary?.source_age_seconds ?? NaN);
   const [error, setError] = useState(false);
   const [networkSummary, setNetworkSummary] = useState<any>(initialSnapshot?.summary ?? null);
+  const [dataSource, setDataSource] = useState<DataSource>(initialSnapshot ? 'LKG' : null);
+  const [lastValidatedAt, setLastValidatedAt] = useState<string | null>(initialSnapshot?.capturedAt ?? null);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      clearTimeout(timer);
+      const now = Date.now();
+      setFreshnessNow(now);
+      timer = setTimeout(tick, nextFreshnessCheck(networkSummary?.source_watermark, now));
+    };
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    tick();
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('focus', tick);
+    };
+  }, [networkSummary?.source_watermark]);
   const [networkAggregate, setNetworkAggregate] = useState<PredictionAggregate | null>(initialSnapshot?.networkAggregate ?? null);
   const [currentAggregate, setCurrentAggregate] = useState<PredictionAggregate | null>(initialSnapshot?.currentAggregate ?? null);
   const [currentAggregateLoading, setCurrentAggregateLoading] = useState<boolean>(!initialSnapshot);
@@ -102,6 +118,9 @@ export function App() {
     try {
       const response=await api.getCurrentPredictions(params.page_size??20,false,undefined,params);
       if(generation!==currentGeneration.current)return false;
+      const acquiredAt = new Date().toISOString();
+      if ((response.pagination.total > 0 || (response.data.source_watermark ?? '') !== '') && classifyFreshness({ watermark: response.data.source_watermark,
+        source: 'API', receivedAt: acquiredAt }).status === 'UNAVAILABLE') throw new Error('Invalid source timestamp');
       if(response.data.source_watermark!==networkWatermark.current || response.data.prediction_generated_at!==networkGenerated.current){
         const summary=await api.getSummary();
         if(generation!==currentGeneration.current)return false;
@@ -110,11 +129,12 @@ export function App() {
         setNetworkSummary(summary);
         void api.getCurrentAggregate({}).then(value=>{if(generation===currentGeneration.current)setNetworkAggregate(value);},()=>{});
       }
-      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);setPageLoaded(true);setBackendOnline(true);
+      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);setPageLoaded(true);setBackendOnline(true);setError(false);
+      setDataSource('API');setLastValidatedAt(new Date().toISOString());setFreshnessNow(Date.now());
       if(response.data.threshold)setThreshold(response.data.threshold);
     await aggregateRequest;
     return true;
-  } catch { if(generation===currentGeneration.current){ setBackendOnline(false); if(!background){setCurrentPredictions([]);setCurrentPageInfo(emptyPage);setCurrentError(true);} else {setCurrentError(false);} } return false; }
+  } catch { if(generation===currentGeneration.current){ setBackendOnline(false); setDataSource(previous=>previous ? 'LKG' : null); if(!background){setCurrentPredictions([]);setCurrentPageInfo(emptyPage);setCurrentError(true);} else {setCurrentError(false);} } return false; }
   finally { if(generation===currentGeneration.current)setCurrentLoading(false); }
   },[]);
   const fetchHistory=useCallback(async(params:PageParams, background=false)=>{
@@ -158,15 +178,19 @@ export function App() {
       if(!active())return;
       if(response.data.source_watermark!==summary.source_watermark ||
         response.data.prediction_generated_at!==summary.query_generated_at)throw new Error('Inconsistent current population');
+      const acquiredAt = new Date().toISOString();
+      if ((response.pagination.total > 0 || (summary.source_watermark ?? '') !== '') && classifyFreshness({ watermark: summary.source_watermark,
+        source: 'API', receivedAt: acquiredAt }).status === 'UNAVAILABLE') throw new Error('Invalid source timestamp');
       // React batches this synchronous promotion: summary and rows share one population.
       setNetworkSummary(summary);networkWatermark.current=summary.source_watermark;networkGenerated.current=summary.query_generated_at;
       setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);
       setPageLoaded(true);setCurrentError(false);setBackendOnline(true);
+      setDataSource('API');setLastValidatedAt(acquiredAt);setFreshnessNow(Date.now());
       if(response.data.threshold)setThreshold(response.data.threshold);
       void api.getCurrentAggregate({}).then(value=>{if(active())setNetworkAggregate(value);},()=>{});
       void api.getCurrentAggregate(currentParams.current).then(value=>{if(active())setCurrentAggregate(value);},()=>{});
     } catch {
-      if(active()){setBackendOnline(false);setError(true);}
+      if(active()){setBackendOnline(false);setError(true);setDataSource(previous=>previous ? 'LKG' : null);}
     } finally {
       if(attempt===liveGeneration.current){setLoading(false);setIsRefreshing(false);setIsWaking(false);}
       if(active()){setCurrentLoading(false);setCurrentAggregateLoading(false);}
@@ -191,6 +215,8 @@ export function App() {
     changeHistory({route,risk_class:majorOnly?'major':'all',page:1});
   };
 
+  const freshness = classifyFreshness({ watermark: networkSummary?.source_watermark,
+    source: dataSource, receivedAt: lastValidatedAt, now: freshnessNow });
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans selection:bg-[#8E001C] selection:text-white">
       <Header
@@ -201,7 +227,8 @@ export function App() {
         onNavigate={handleNavigate}
         isFallback={isFallback}
         backendOnline={backendOnline}
-        unavailable={error || loading}
+        dataStatus={freshness.status}
+        unavailable={error || currentError || loading}
         isWaking={isWaking || loading}
         wakingMessage={wakingMessage}
         onRefresh={() => loadData(true, true)}
@@ -214,6 +241,9 @@ export function App() {
         </div>}
         {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{t.states.noCurrentData}</p>}
         <HeroOverview
+          freshness={freshness}
+          dataSource={dataSource}
+          lastValidatedAt={lastValidatedAt}
           sourceWatermark={networkSummary?.source_watermark ?? ''}
           sourceAgeSeconds={networkSummary?.source_watermark ? computeSourceAge(networkSummary.source_watermark, freshnessNow) : NaN}
           predictionCount={networkSummary?.scored_count ?? null}

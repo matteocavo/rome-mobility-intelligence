@@ -52,8 +52,8 @@ for (const count of [3, 10]) {
 }
 
 const labels = {
-  it: ['Connessione dati attiva', 'Ultimi dati disponibili', 'Dati non disponibili'],
-  en: ['Data connection active', 'Latest available data', 'Data unavailable'],
+  it: ['API raggiungibile', 'API non verificata', 'API non raggiungibile'],
+  en: ['API reachable', 'API not checked', 'API unreachable'],
 };
 
 for (const language of ['it', 'en']) {
@@ -61,7 +61,7 @@ for (const language of ['it', 'en']) {
   for (const [name, state, text, color] of [
     ['connected', { backendOnline: true }, connected, '#10B981'],
     ['last known good', {}, latest, '#FFB300'],
-    ['fallback despite connection', { backendOnline: true, isFallback: true }, latest, '#FFB300'],
+    ['API reachable with retained data', { backendOnline: true, isFallback: true }, connected, '#10B981'],
     ['unavailable', { unavailable: true }, unavailable, '#8E001C'],
   ]) {
     test(`${language}: desktop status identifies ${name} in text and color`, () => {

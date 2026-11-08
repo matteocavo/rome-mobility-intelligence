@@ -38,6 +38,7 @@ async function bootstrap(snapshot) {
       }
       if (specifier === './api/client') return `import { parseRows } from '${pathToFileURL(join(root, 'src/api/snapshotSchema.js')).href}'; const api = {};`;
       if (specifier === './api/snapshotSchema.js') return statement.replace(specifier, pathToFileURL(join(root, 'src/api/snapshotSchema.js')).href);
+      if (specifier === './api/freshness.js') return statement.replace(specifier, pathToFileURL(join(root, 'src/api/freshness.js')).href);
       if (specifier === './api/modelInfo') return 'const DOCUMENTED_MODEL_INFO = {};';
       if (specifier === './data/snapshot.json') return `const bundledSnapshotRaw = ${JSON.stringify(snapshot)};`;
       if (specifier === './i18n/translations') return 'const translations = {it:{},en:{}};';

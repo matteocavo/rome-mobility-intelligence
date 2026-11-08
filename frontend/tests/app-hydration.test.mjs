@@ -45,6 +45,7 @@ async function mount(snapshot, apiMock) {
       }
       if (specifier === './api/client') return `import { parseRows } from '${pathToFileURL(join(root, 'src/api/snapshotSchema.js')).href}'; const api = globalThis.__rmiApi;`;
       if (specifier === './api/snapshotSchema.js') return statement.replace(specifier, pathToFileURL(join(root, 'src/api/snapshotSchema.js')).href);
+      if (specifier === './api/freshness.js') return statement.replace(specifier, pathToFileURL(join(root, 'src/api/freshness.js')).href);
       if (specifier === './api/modelInfo') return 'const DOCUMENTED_MODEL_INFO = {};';
       if (specifier === './data/snapshot.json') return `const bundledSnapshotRaw = ${JSON.stringify(snapshot)};`;
       if (specifier === './i18n/translations') return `const translations = {it:{states:{unavailable:'Unavailable'}},en:{states:{unavailable:'Unavailable'}}};`;
@@ -56,6 +57,7 @@ async function mount(snapshot, apiMock) {
     reactRoot = createRoot(document.getElementById('root'));
     await act(async () => { reactRoot.render(React.createElement(App)); });
     return { views: captured, refresh: () => act(async () => { captured.Header.onRefresh(); }),
+      searchCurrent: value => act(async () => { captured.LineSearch.onSearch(value); }),
       close: async () => { await act(async () => reactRoot.unmount()); cleanup(); } };
   } catch (error) { cleanup(); throw error; }
   function cleanup() {
@@ -74,18 +76,22 @@ const api = overrides => ({ getRoutes:async()=>[],getSummary:async()=>summary(2)
 
 test('summary success and current failure never advertises online or replaces LKG', async()=>{
  const app=await mount(bundle,api({getCurrentPredictions:async()=>{throw new Error('offline');}}));
- try { assert.equal(app.views.Header.backendOnline,false); assert.equal(app.views.HeroOverview.predictionCount,1); assert.equal(app.views.LivePredictions.predictions.length,1); }
+ try { assert.equal(app.views.Header.backendOnline,false); assert.equal(app.views.HeroOverview.predictionCount,1); assert.equal(app.views.LivePredictions.predictions.length,1);
+   assert.equal(app.views.HeroOverview.dataSource,'LKG');assert.equal(app.views.Header.dataStatus,'STALE'); }
  finally {await app.close();}
 });
 test('refresh keeps latest live rows visible and retains them after failure',async()=>{
  const mock=api(); const app=await mount(bundle,mock);
  try {
   assert.equal(app.views.Header.backendOnline,true); assert.equal(app.views.HeroOverview.predictionCount,2);
+  assert.equal(app.views.HeroOverview.dataSource,'API');
+  const lastAcquisition=app.views.HeroOverview.lastValidatedAt;
   const pending=deferred(); mock.getCurrentPredictions=()=>pending.promise;
   await app.refresh();
   assert.equal(app.views.LivePredictions.loading,false); assert.equal(app.views.LivePredictions.predictions.length,2);
   await act(async()=>pending.reject(new Error('offline')));
   assert.equal(app.views.Header.backendOnline,false); assert.equal(app.views.HeroOverview.predictionCount,2); assert.equal(app.views.LivePredictions.predictions.length,2);
+  assert.equal(app.views.HeroOverview.dataSource,'LKG');assert.equal(app.views.HeroOverview.lastValidatedAt,lastAcquisition);
  } finally {await app.close();}
 });
 test('summary waits for current before promotion and stale refresh cannot overwrite newer state',async()=>{
@@ -107,6 +113,64 @@ test('online-first startup without bundle promotes live data',async()=>{
   assert.equal(app.views.HeroOverview.predictionCount,2);
   assert.equal(app.views.LivePredictions.predictions.length,2);
   assert.equal(app.views.LivePredictions.loading,false);
+ } finally {await app.close();}
+});
+
+test('source freshness crosses LIVE and DELAYED boundaries while API remains reachable without polling', async context => {
+ context.mock.timers.enable({apis:['Date','setTimeout'],now:Date.parse(stamp)+119000});
+ let calls=0;
+ const app=await mount({},api({getSummary:async()=>{calls++;return summary(2);}}));
+ try {
+  assert.equal(app.views.Header.dataStatus,'LIVE');
+  assert.equal(app.views.HeroOverview.dataSource,'API');
+  await act(async()=>context.mock.timers.tick(1001));
+  assert.equal(app.views.Header.dataStatus,'DELAYED');
+  await act(async()=>context.mock.timers.tick(780000));
+  assert.equal(app.views.Header.dataStatus,'STALE');
+  assert.equal(app.views.Header.backendOnline,true);
+  assert.equal(calls,1);
+  // A suspended tab reclassifies immediately on focus, using no additional API call.
+  context.mock.timers.setTime(Date.parse(stamp)+1200000);
+  await act(async()=>window.dispatchEvent(new window.Event('focus')));
+  assert.equal(app.views.Header.dataStatus,'STALE');assert.equal(calls,1);
+ } finally {await app.close();context.mock.timers.reset();}
+});
+
+test('valid empty API response remains an empty population with independent connection status', async()=>{
+ const app=await mount({},api({getSummary:async()=>summary(0),getCurrentPredictions:async()=>current(0)}));
+ try {
+  assert.equal(app.views.Header.backendOnline,true);
+  assert.equal(app.views.HeroOverview.dataSource,'API');
+  assert.equal(app.views.HeroOverview.predictionCount,0);
+  assert.equal(app.views.LivePredictions.predictions.length,0);
+ } finally {await app.close();}
+});
+
+test('future source timestamp cannot replace valid last-known-good data', async()=>{
+ const future=new Date(Date.now()+60000).toISOString();
+ for (const count of [0,2]) {
+  const response=current(count);response.data.source_watermark=future;response.data.prediction_generated_at=future;
+  const app=await mount(bundle,api({getSummary:async()=>({...summary(count),source_watermark:future,query_generated_at:future}),getCurrentPredictions:async()=>response}));
+  try {
+   assert.equal(app.views.Header.backendOnline,false);
+   assert.equal(app.views.Header.dataStatus,'STALE');
+   assert.equal(app.views.HeroOverview.predictionCount,1);
+   assert.equal(app.views.HeroOverview.dataSource,'LKG');
+  } finally {await app.close();}
+ }
+});
+
+test('current-page failure marks API unreachable and a successful page read clears the connection error',async()=>{
+ const mock=api();const app=await mount(bundle,mock);
+ try {
+  mock.getCurrentPredictions=async()=>{throw new Error('offline');};
+  await app.searchCurrent('64');
+  assert.equal(app.views.Header.backendOnline,false);assert.equal(app.views.Header.unavailable,true);
+  assert.equal(app.views.HeroOverview.dataSource,'LKG');
+  mock.getCurrentPredictions=async()=>current(2);
+  await app.searchCurrent('64');
+  assert.equal(app.views.Header.backendOnline,true);assert.equal(app.views.Header.unavailable,false);
+  assert.equal(app.views.HeroOverview.dataSource,'API');
  } finally {await app.close();}
 });
 
