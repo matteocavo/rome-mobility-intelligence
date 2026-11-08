@@ -239,7 +239,7 @@ def test_response_headers_secrets_and_transport_sanitization():
 
 def test_workflow_is_gated_minimal_and_only_calls_reviewed_client():
     text = Path(".github/workflows/persist-current-predictions.yml").read_text(encoding="utf-8")
-    assert "cron: '17,47 * * * *'" in text and "workflow_dispatch:" in text
+    assert "cron: '17 */3 * * *'" in text and "workflow_dispatch:" in text
     assert "contents: read" in text and "write" not in text
     assert "RMI_ORCHESTRATION_ENABLED == 'true'" in text
     assert "cancel-in-progress: false" in text and "timeout-minutes: 15" in text
