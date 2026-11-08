@@ -2,7 +2,7 @@ name: Persist current predictions (zero-cost fallback)
 on:
   schedule:
     # UTC, off the hour; change reviewed cron to change cadence. No keep-alive pings.
-    - cron: '17,47 * * * *'
+    - cron: '17 */3 * * *'
   workflow_dispatch:
 permissions:
   contents: read
