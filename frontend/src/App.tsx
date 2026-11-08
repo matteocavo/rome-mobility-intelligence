@@ -119,7 +119,7 @@ export function App() {
       const response=await api.getCurrentPredictions(params.page_size??20,false,undefined,params);
       if(generation!==currentGeneration.current)return false;
       const acquiredAt = new Date().toISOString();
-      if (response.pagination.total > 0 && classifyFreshness({ watermark: response.data.source_watermark,
+      if ((response.pagination.total > 0 || (response.data.source_watermark ?? '') !== '') && classifyFreshness({ watermark: response.data.source_watermark,
         source: 'API', receivedAt: acquiredAt }).status === 'UNAVAILABLE') throw new Error('Invalid source timestamp');
       if(response.data.source_watermark!==networkWatermark.current || response.data.prediction_generated_at!==networkGenerated.current){
         const summary=await api.getSummary();
@@ -179,7 +179,7 @@ export function App() {
       if(response.data.source_watermark!==summary.source_watermark ||
         response.data.prediction_generated_at!==summary.query_generated_at)throw new Error('Inconsistent current population');
       const acquiredAt = new Date().toISOString();
-      if (response.pagination.total > 0 && classifyFreshness({ watermark: summary.source_watermark,
+      if ((response.pagination.total > 0 || (summary.source_watermark ?? '') !== '') && classifyFreshness({ watermark: summary.source_watermark,
         source: 'API', receivedAt: acquiredAt }).status === 'UNAVAILABLE') throw new Error('Invalid source timestamp');
       // React batches this synchronous promotion: summary and rows share one population.
       setNetworkSummary(summary);networkWatermark.current=summary.source_watermark;networkGenerated.current=summary.query_generated_at;

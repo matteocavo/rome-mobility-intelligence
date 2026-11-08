@@ -148,14 +148,16 @@ test('valid empty API response remains an empty population with independent conn
 
 test('future source timestamp cannot replace valid last-known-good data', async()=>{
  const future=new Date(Date.now()+60000).toISOString();
- const response=current(2);response.data.source_watermark=future;response.data.prediction_generated_at=future;
- const app=await mount(bundle,api({getSummary:async()=>({...summary(2),source_watermark:future,query_generated_at:future}),getCurrentPredictions:async()=>response}));
- try {
-  assert.equal(app.views.Header.backendOnline,false);
-  assert.equal(app.views.Header.dataStatus,'STALE');
-  assert.equal(app.views.HeroOverview.predictionCount,1);
-  assert.equal(app.views.HeroOverview.dataSource,'LKG');
- } finally {await app.close();}
+ for (const count of [0,2]) {
+  const response=current(count);response.data.source_watermark=future;response.data.prediction_generated_at=future;
+  const app=await mount(bundle,api({getSummary:async()=>({...summary(count),source_watermark:future,query_generated_at:future}),getCurrentPredictions:async()=>response}));
+  try {
+   assert.equal(app.views.Header.backendOnline,false);
+   assert.equal(app.views.Header.dataStatus,'STALE');
+   assert.equal(app.views.HeroOverview.predictionCount,1);
+   assert.equal(app.views.HeroOverview.dataSource,'LKG');
+  } finally {await app.close();}
+ }
 });
 
 test('current-page failure marks API unreachable and a successful page read clears the connection error',async()=>{
