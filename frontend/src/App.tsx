@@ -129,7 +129,7 @@ export function App() {
         setNetworkSummary(summary);
         void api.getCurrentAggregate({}).then(value=>{if(generation===currentGeneration.current)setNetworkAggregate(value);},()=>{});
       }
-      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);setPageLoaded(true);setBackendOnline(true);
+      setCurrentPredictions(response.data.predictions);setCurrentPageInfo(response.pagination);setPageLoaded(true);setBackendOnline(true);setError(false);
       setDataSource('API');setLastValidatedAt(new Date().toISOString());setFreshnessNow(Date.now());
       if(response.data.threshold)setThreshold(response.data.threshold);
     await aggregateRequest;
@@ -228,7 +228,7 @@ export function App() {
         isFallback={isFallback}
         backendOnline={backendOnline}
         dataStatus={freshness.status}
-        unavailable={error || loading}
+        unavailable={error || currentError || loading}
         isWaking={isWaking || loading}
         wakingMessage={wakingMessage}
         onRefresh={() => loadData(true, true)}

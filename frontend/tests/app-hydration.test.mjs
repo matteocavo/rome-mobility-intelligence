@@ -57,6 +57,7 @@ async function mount(snapshot, apiMock) {
     reactRoot = createRoot(document.getElementById('root'));
     await act(async () => { reactRoot.render(React.createElement(App)); });
     return { views: captured, refresh: () => act(async () => { captured.Header.onRefresh(); }),
+      searchCurrent: value => act(async () => { captured.LineSearch.onSearch(value); }),
       close: async () => { await act(async () => reactRoot.unmount()); cleanup(); } };
   } catch (error) { cleanup(); throw error; }
   function cleanup() {
@@ -154,6 +155,20 @@ test('future source timestamp cannot replace valid last-known-good data', async(
   assert.equal(app.views.Header.dataStatus,'STALE');
   assert.equal(app.views.HeroOverview.predictionCount,1);
   assert.equal(app.views.HeroOverview.dataSource,'LKG');
+ } finally {await app.close();}
+});
+
+test('current-page failure marks API unreachable and a successful page read clears the connection error',async()=>{
+ const mock=api();const app=await mount(bundle,mock);
+ try {
+  mock.getCurrentPredictions=async()=>{throw new Error('offline');};
+  await app.searchCurrent('64');
+  assert.equal(app.views.Header.backendOnline,false);assert.equal(app.views.Header.unavailable,true);
+  assert.equal(app.views.HeroOverview.dataSource,'LKG');
+  mock.getCurrentPredictions=async()=>current(2);
+  await app.searchCurrent('64');
+  assert.equal(app.views.Header.backendOnline,true);assert.equal(app.views.Header.unavailable,false);
+  assert.equal(app.views.HeroOverview.dataSource,'API');
  } finally {await app.close();}
 });
 
