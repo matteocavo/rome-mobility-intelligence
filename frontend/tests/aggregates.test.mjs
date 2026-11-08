@@ -29,6 +29,34 @@ const {renderToStaticMarkup} = await import('react-dom/server');
 const load = file => import(pathToFileURL(join(temporary,file)));
 const {api, parseAggregate, PublicApiError} = await load('api/client.js');
 const {translations} = await load('i18n/translations.js');
+
+test('freshness view labels API and LKG separately with full source and acquisition timestamps in IT/EN', async () => {
+  const {DataFreshness}=await load('components/DataFreshness.js');
+  const {Header}=await load('components/Header.js');
+  const watermark='2026-10-30T07:47:16Z', receivedAt='2026-10-30T09:58:53.212Z';
+  for (const language of ['it','en']) {
+    for (const [status,source] of [['LIVE','API'],['DELAYED','API'],['STALE','API'],['STALE','LKG']]) {
+      const dom=new (await import('jsdom')).JSDOM(el(DataFreshness,{freshness:{status,ageSeconds:900},source,
+        sourceWatermark:watermark,receivedAt,language}));
+      try {
+        assert.match(dom.window.document.body.textContent,new RegExp(status));
+        assert.match(dom.window.document.body.textContent,new RegExp(source));
+        const times=[...dom.window.document.querySelectorAll('time')];
+        assert.deepEqual(times.map(t=>t.dateTime),[watermark,receivedAt]);
+        assert.ok(times.every(t=>t.textContent.includes('2026')));
+        assert.match(times[0].textContent,/08:47:16/);
+        if(source==='LKG')assert.match(dom.window.document.body.textContent,language==='it'?/Ultimi dati disponibili/:/Latest available data/);
+      } finally {dom.window.close();}
+    }
+    const unavailable=el(DataFreshness,{freshness:{status:'UNAVAILABLE',ageSeconds:NaN},source:null,
+      sourceWatermark:'',receivedAt:null,language});
+    assert.match(unavailable,/UNAVAILABLE/);assert.doesNotMatch(unavailable,/<time/);
+    const header=el(Header,{language,t:translations[language],backendOnline:true,dataStatus:'STALE',
+      isFallback:false,isWaking:false,unavailable:false,setLanguage(){},onNavigate(){},onRefresh(){}});
+    assert.match(header,language==='it'?/API raggiungibile/:/API reachable/);
+    assert.match(header,/STALE/);assert.doesNotMatch(header,/>LIVE</);
+  }
+});
 after(() => rmSync(temporary, {recursive:true, force:true}));
 const el = (component, props) => renderToStaticMarkup(React.createElement(component, props));
 const bins = counts => { const total=counts.reduce((a,b)=>a+b,0); return counts.map((count,i)=>({lower:i/10,upper:(i+1)/10,count,percentage:total?count/total*100:0})); };

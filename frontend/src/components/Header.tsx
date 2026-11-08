@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { GithubIcon } from './GithubIcon';
 import { Language, Translations } from '../i18n/translations';
+import type { FreshnessState } from '../api/freshness.js';
 
 interface HeaderProps {
   language: Language;
@@ -16,6 +17,7 @@ interface HeaderProps {
   onNavigate: (sectionId: string) => void;
   isFallback: boolean;
   backendOnline?: boolean;
+  dataStatus?: FreshnessState;
   unavailable?: boolean;
   isWaking: boolean;
   wakingMessage: string;
@@ -31,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
   isFallback,
   backendOnline = false,
+  dataStatus = 'UNAVAILABLE',
   unavailable,
   isWaking,
   wakingMessage,
@@ -38,12 +41,13 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isConnected = backendOnline && !isFallback && !unavailable && !isWaking;
+  const isConnected = backendOnline && !unavailable && !isWaking;
   const statusLabel = isWaking
     ? (wakingMessage || t.status.wakingService)
     : unavailable
-      ? (language === 'it' ? 'Dati non disponibili' : 'Data unavailable')
-      : isConnected ? t.status.connectedData : t.status.liveApi;
+      ? (language === 'it' ? 'API non raggiungibile' : 'API unreachable')
+      : isConnected ? (language === 'it' ? 'API raggiungibile' : 'API reachable')
+        : (language === 'it' ? 'API non verificata' : 'API not checked');
   const statusDot = unavailable && !isWaking
     ? 'bg-[#8E001C]' : isConnected ? 'bg-[#10B981]' : 'bg-[#FFB300]';
 
@@ -152,6 +156,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
+            <span role="status" aria-label={`${language === 'it' ? 'Freschezza dati' : 'Data freshness'}: ${dataStatus}`}
+              className="hidden sm:inline-flex rounded border border-[#E5E7EB] px-1.5 py-0.5 text-[10px] font-semibold text-[#4B5563]">
+              {dataStatus}
+            </span>
             {/* Language Selector: IT | EN */}
             <div className="flex items-center rounded-md border border-[#E5E7EB] bg-[#F9FAFB] p-0.5 text-xs font-bold">
               <button

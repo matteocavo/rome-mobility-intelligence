@@ -1,8 +1,13 @@
 import React from 'react';
 import { Clock, Info, AlertTriangle, Layers, Gauge, Activity } from 'lucide-react';
 import { Translations, Language } from '../i18n/translations';
+import { DataFreshness, freshnessColors } from './DataFreshness';
+import type { DataSource, Freshness } from '../api/freshness.js';
 
 interface HeroOverviewProps {
+  freshness?: Freshness;
+  dataSource?: DataSource;
+  lastValidatedAt?: string | null;
   sourceWatermark: string;
   sourceAgeSeconds: number;
   predictionCount: number | null;
@@ -17,6 +22,9 @@ interface HeroOverviewProps {
 }
 
 export const HeroOverview: React.FC<HeroOverviewProps> = ({
+  freshness = { status: 'UNAVAILABLE', ageSeconds: NaN },
+  dataSource = null,
+  lastValidatedAt = null,
   sourceWatermark,
   sourceAgeSeconds,
   predictionCount,
@@ -73,6 +81,8 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
 
       </div>
 
+      <DataFreshness freshness={freshness} source={dataSource} sourceWatermark={sourceWatermark}
+        receivedAt={lastValidatedAt} language={language} />
       {/* 5 Distinct KPI Cards matching reference design */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mt-3">
         {/* KPI 1: Osservazioni analizzate */}
@@ -94,7 +104,7 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
             </span>
           </div>
           <div className="pt-2 text-xs text-[#6B7280] border-t border-[#F9FAFB]">
-            {language === 'it' ? 'Popolazione scoring corrente' : 'Current scoring population'}
+            {language === 'it' ? 'Popolazione dello snapshot' : 'Snapshot population'}
           </div>
         </div>
 
@@ -183,8 +193,8 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
             </div>
           </div>
           <div className="my-1">
-            <span className="text-2xl sm:text-3xl font-extrabold font-mono whitespace-nowrap text-[#065F46]">
-              {Number.isFinite(sourceAgeSeconds) ? `${Math.floor(sourceAgeSeconds / 60)}m ${Math.round(sourceAgeSeconds % 60)}s` : '—'}
+            <span className="text-2xl sm:text-3xl font-extrabold font-mono whitespace-nowrap text-[#111827]">
+              {Number.isFinite(freshness.ageSeconds) ? `${Math.floor(freshness.ageSeconds / 60)}m ${Math.floor(freshness.ageSeconds % 60)}s` : '—'}
             </span>
             <span className="text-xs text-[#6B7280] font-normal ml-1.5">
               {language === 'it' ? 'fa' : 'ago'}
@@ -194,8 +204,8 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
             <span className="text-xs text-[#6B7280]">
               {language === 'it' ? 'Età del feed sorgente' : 'Source feed age'}
             </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-              {language === 'it' ? 'OSSERVATO' : 'OBSERVED'}
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${freshnessColors[freshness.status]}`}>
+              {freshness.status}
             </span>
           </div>
         </div>
