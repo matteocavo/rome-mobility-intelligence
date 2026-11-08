@@ -165,7 +165,7 @@ export function App() {
     const attempt=++liveGeneration.current;
     const generation=++currentGeneration.current;
     const active=()=>attempt===liveGeneration.current && generation===currentGeneration.current;
-    setIsRefreshing(refresh);setError(false);
+    setIsRefreshing(refresh || background);setError(false);
     if(!background){setLoading(true);setIsWaking(true);setCurrentLoading(true);}
     setWakingMessage(language==='it'?'Avvio del servizio dati…':'Waking data service…');
     try {
@@ -229,6 +229,7 @@ export function App() {
         backendOnline={backendOnline}
         dataStatus={freshness.status}
         unavailable={error || currentError || loading}
+        isChecking={currentLoading}
         isWaking={isWaking || loading}
         wakingMessage={wakingMessage}
         onRefresh={() => loadData(true, true)}

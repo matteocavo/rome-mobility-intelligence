@@ -39,22 +39,22 @@ test('freshness view labels API and LKG separately with full source and acquisit
       const dom=new (await import('jsdom')).JSDOM(el(DataFreshness,{freshness:{status,ageSeconds:900},source,
         sourceWatermark:watermark,receivedAt,language}));
       try {
-        assert.match(dom.window.document.body.textContent,new RegExp(status));
+        assert.match(dom.window.document.body.textContent,new RegExp(translations[language].status.freshnessLabels[status]));
         assert.match(dom.window.document.body.textContent,new RegExp(source));
         const times=[...dom.window.document.querySelectorAll('time')];
         assert.deepEqual(times.map(t=>t.dateTime),[watermark,receivedAt]);
         assert.ok(times.every(t=>t.textContent.includes('2026')));
         assert.match(times[0].textContent,/08:47:16/);
-        if(source==='LKG')assert.match(dom.window.document.body.textContent,language==='it'?/Ultimi dati disponibili/:/Latest available data/);
+        if(source==='LKG')assert.match(dom.window.document.body.textContent,/LKG/);
       } finally {dom.window.close();}
     }
     const unavailable=el(DataFreshness,{freshness:{status:'UNAVAILABLE',ageSeconds:NaN},source:null,
       sourceWatermark:'',receivedAt:null,language});
-    assert.match(unavailable,/UNAVAILABLE/);assert.doesNotMatch(unavailable,/<time/);
+    assert.match(unavailable,new RegExp(translations[language].status.freshnessLabels.UNAVAILABLE));assert.doesNotMatch(unavailable,/<time/);
     const header=el(Header,{language,t:translations[language],backendOnline:true,dataStatus:'STALE',
       isFallback:false,isWaking:false,unavailable:false,setLanguage(){},onNavigate(){},onRefresh(){}});
-    assert.match(header,language==='it'?/API raggiungibile/:/API reachable/);
-    assert.match(header,/STALE/);assert.doesNotMatch(header,/>LIVE</);
+    assert.match(header,language==='it'?/Servizio connesso/:/Service connected/);
+    assert.match(header,new RegExp(translations[language].status.freshnessLabels.STALE));assert.doesNotMatch(header,/>LIVE</);
   }
 });
 after(() => rmSync(temporary, {recursive:true, force:true}));

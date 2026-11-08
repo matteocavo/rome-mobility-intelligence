@@ -10,6 +10,13 @@ export interface Translations {
     viewGithub: string;
   };
   status: {
+    checking: string;
+    unchecked: string;
+    connected: string;
+    disconnected: string;
+    connection: string;
+    freshness: string;
+    freshnessLabels: Record<'LIVE' | 'DELAYED' | 'STALE' | 'UNAVAILABLE', string>;
     liveApi: string;
     connectedData: string;
     demoData: string;
@@ -301,6 +308,11 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
+      checking: 'Verifica in corso', unchecked: 'Connessione non ancora verificata',
+      connected: 'Servizio connesso', disconnected: 'Servizio non disponibile',
+      connection: 'Connessione', freshness: 'Freschezza dati',
+      freshnessLabels: { LIVE: 'Dati aggiornati', DELAYED: 'Aggiornamento in ritardo',
+        STALE: 'Dati non aggiornati', UNAVAILABLE: 'Dati non disponibili' },
       liveApi: 'Ultimi dati disponibili',
       connectedData: 'Connessione dati attiva',
       demoData: 'Dati dimostrativi',
@@ -643,6 +655,11 @@ export const translations: Record<Language, Translations> = {
       viewGithub: 'GitHub',
     },
     status: {
+      checking: 'Checking connection', unchecked: 'Connection not yet checked',
+      connected: 'Service connected', disconnected: 'Service unavailable',
+      connection: 'Connection', freshness: 'Data freshness',
+      freshnessLabels: { LIVE: 'Up-to-date data', DELAYED: 'Update delayed',
+        STALE: 'Outdated data', UNAVAILABLE: 'Data unavailable' },
       liveApi: 'Latest available data',
       connectedData: 'Data connection active',
       demoData: 'Synthetic data',

@@ -52,8 +52,8 @@ for (const count of [3, 10]) {
 }
 
 const labels = {
-  it: ['API raggiungibile', 'API non verificata', 'API non raggiungibile'],
-  en: ['API reachable', 'API not checked', 'API unreachable'],
+  it: ['Servizio connesso', 'Connessione non ancora verificata', 'Servizio non disponibile'],
+  en: ['Service connected', 'Connection not yet checked', 'Service unavailable'],
 };
 
 for (const language of ['it', 'en']) {
@@ -63,6 +63,9 @@ for (const language of ['it', 'en']) {
     ['last known good', {}, latest, '#FFB300'],
     ['API reachable with retained data', { backendOnline: true, isFallback: true }, connected, '#10B981'],
     ['unavailable', { unavailable: true }, unavailable, '#8E001C'],
+    ['checking', { isChecking: true }, translations[language].status.checking, '#FFB300'],
+    ['refreshing', { isRefreshing: true, backendOnline: true }, translations[language].status.checking, '#FFB300'],
+    ['unreachable despite prior success', { backendOnline: true, unavailable: true }, unavailable, '#8E001C'],
   ]) {
     test(`${language}: desktop status identifies ${name} in text and color`, () => {
       const dom = new JSDOM(renderToStaticMarkup(React.createElement(Header, props(language, state))));
@@ -89,10 +92,10 @@ for (const language of ['it', 'en']) {
         [{ backendOnline: true }, connected, '#10B981'],
         [{}, latest, '#FFB300'],
         [{ unavailable: true }, unavailable, '#8E001C'],
-        [{ isWaking: true, unavailable: true }, translations[language].status.wakingService, '#FFB300'],
+        [{ isWaking: true, unavailable: true }, translations[language].status.checking, '#FFB300'],
       ]) {
         await act(() => root.render(React.createElement(Header, props(language, state))));
-        const badge = [...document.querySelectorAll('[role="status"]')].at(-1);
+        const badge = document.querySelector('[role="status"]');
         assert.equal(badge.textContent, text);
         assert.ok(badge.querySelector('[aria-hidden="true"]').className.includes(color));
       }
@@ -102,4 +105,21 @@ for (const language of ['it', 'en']) {
       dom.window.close();
     }
   });
+}
+
+for (const language of ['it', 'en']) {
+  for (const state of ['LIVE', 'DELAYED', 'STALE', 'UNAVAILABLE']) {
+    test(`${language}: localized freshness ${state} is distinct from connection`, () => {
+      const dom = new JSDOM(renderToStaticMarkup(React.createElement(Header,
+        props(language, { backendOnline: true, dataStatus: state }))));
+      try {
+        const status = translations[language].status;
+        const badges = [...dom.window.document.querySelectorAll('[role="status"]')];
+        assert.ok(badges.some(b => b.getAttribute('aria-label') === `${status.connection}: ${status.connected}`));
+        assert.ok(badges.some(b => b.getAttribute('aria-label') === `${status.freshness}: ${status.freshnessLabels[state]}`));
+        assert.ok(badges.every(b => !/LIVE|DELAYED|STALE|UNAVAILABLE/.test(b.textContent)));
+        assert.equal(dom.window.document.querySelector('button[aria-label="' + status.refresh + '"]').title, status.refresh);
+      } finally { dom.window.close(); }
+    });
+  }
 }
