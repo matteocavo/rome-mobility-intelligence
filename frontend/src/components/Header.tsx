@@ -3,7 +3,6 @@ import {
   Menu,
   X,
   RefreshCw,
-  Activity,
 } from 'lucide-react';
 import { GithubIcon } from './GithubIcon';
 import { Language, Translations } from '../i18n/translations';
@@ -19,6 +18,7 @@ interface HeaderProps {
   backendOnline?: boolean;
   dataStatus?: FreshnessState;
   unavailable?: boolean;
+  isChecking?: boolean;
   isWaking: boolean;
   wakingMessage: string;
   onRefresh: () => void;
@@ -35,21 +35,31 @@ export const Header: React.FC<HeaderProps> = ({
   backendOnline = false,
   dataStatus = 'UNAVAILABLE',
   unavailable,
+  isChecking: requestInProgress = false,
   isWaking,
-  wakingMessage,
   onRefresh,
   isRefreshing,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isConnected = backendOnline && !unavailable && !isWaking;
-  const statusLabel = isWaking
-    ? (wakingMessage || t.status.wakingService)
-    : unavailable
-      ? (language === 'it' ? 'API non raggiungibile' : 'API unreachable')
-      : isConnected ? (language === 'it' ? 'API raggiungibile' : 'API reachable')
-        : (language === 'it' ? 'API non verificata' : 'API not checked');
-  const statusDot = unavailable && !isWaking
+  const isChecking = requestInProgress || isWaking || isRefreshing;
+  const isConnected = backendOnline && !unavailable && !isChecking;
+  const statusLabel = isChecking ? t.status.checking
+    : unavailable ? t.status.disconnected
+      : isConnected ? t.status.connected : t.status.unchecked;
+  const statusDot = unavailable && !isChecking
     ? 'bg-[#8E001C]' : isConnected ? 'bg-[#10B981]' : 'bg-[#FFB300]';
+  const freshnessLabel = t.status.freshnessLabels[dataStatus];
+  const statusBadges = <>
+    <span role="status" aria-label={`${t.status.connection}: ${statusLabel}`}
+      className="flex min-w-0 items-center gap-1.5 rounded border border-[#E5E7EB] bg-[#F8F9FA] px-2 py-0.5 text-[11px] font-medium text-[#4B5563]">
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
+      <span>{statusLabel}</span>
+    </span>
+    <span role="status" aria-label={`${t.status.freshness}: ${freshnessLabel}`}
+      className="rounded border border-[#E5E7EB] px-1.5 py-0.5 text-[11px] font-semibold text-[#4B5563]">
+      {freshnessLabel}
+    </span>
+  </>;
 
   const navItems = [
     { id: 'overview', label: t.nav.overview },
@@ -70,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Distinctive Transport Brand Lockup */}
           <div
-            className="flex items-center space-x-3 cursor-pointer group select-none"
+            className="flex min-w-0 items-center space-x-2 sm:space-x-3 mr-2 cursor-pointer group select-none"
             onClick={() => handleNavClick('overview')}
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-md bg-[#8E001C] flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
@@ -88,13 +98,13 @@ export const Header: React.FC<HeaderProps> = ({
                 <path d="M7 21L9 19M17 21L15 19" stroke="#FFB300" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </div>
-            <div>
-              <div className="flex items-center space-x-2 leading-none">
-                <span className="text-sm sm:text-base font-extrabold tracking-tight text-[#111827]">
+            <div className="min-w-0">
+              <div className="leading-tight">
+                <span className="text-xs sm:text-base font-extrabold tracking-tight text-[#111827]">
                   Rome Mobility <span className="text-[#8E001C]">Intelligence</span>
                 </span>
               </div>
-              <span className="text-[10px] sm:text-[11px] text-[#6B7280] font-medium tracking-tight">
+              <span className="hidden sm:block text-[11px] text-[#6B7280] font-medium tracking-tight">
                 {language === 'it' ? 'Trasporto pubblico & ritardi' : 'Transit reliability & delay prediction'}
               </span>
             </div>
@@ -121,45 +131,8 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Integrated Status & Utilities */}
-          <div className="flex items-center space-x-2 sm:space-x-2.5">
-            {/* Integrated Subtle Data Status */}
-            {unavailable && !isWaking ? (
-              <>
-                <span role="status" className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]">
-                  <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
-                  <span>{statusLabel}</span>
-                </span>
-                <span role="status" aria-label={statusLabel} className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FDF2F4] text-[#8E001C] border border-[#F2C8D0]">
-                  <Activity className="w-3.5 h-3.5" />
-                </span>
-              </>
-            ) : isWaking ? (
-              <>
-                <div className="sm:hidden flex items-center justify-center w-7 h-7 rounded bg-[#FFF9E6] text-[#D49000] border border-[#FEEA9F]" role="status" aria-label={wakingMessage || t.status.wakingService}>
-                  <Activity className="w-3.5 h-3.5 animate-pulse" />
-                </div>
-                <div className="hidden sm:flex items-center space-x-1 px-2 py-1 text-[11px] font-medium rounded bg-[#FFF9E6] text-[#9A6700] border border-[#FEEA9F]">
-                  <Activity className="w-3 h-3 animate-pulse text-[#D49000]" />
-                  <span className="truncate max-w-[110px] sm:max-w-none">{wakingMessage || t.status.wakingService}</span>
-                </div>
-              </>
-            ) : (
-              <div
-                role="status"
-                className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 text-[11px] font-medium text-[#4B5563] bg-[#F8F9FA] rounded border border-[#E5E7EB]"
-                title={statusLabel}
-              >
-                <span aria-hidden="true"
-                  className={`w-1.5 h-1.5 rounded-full ${statusDot}`}
-                ></span>
-                <span>{statusLabel}</span>
-              </div>
-            )}
-
-            <span role="status" aria-label={`${language === 'it' ? 'Freschezza dati' : 'Data freshness'}: ${dataStatus}`}
-              className="hidden sm:inline-flex rounded border border-[#E5E7EB] px-1.5 py-0.5 text-[10px] font-semibold text-[#4B5563]">
-              {dataStatus}
-            </span>
+          <div className="flex shrink-0 items-center space-x-1 sm:space-x-2.5">
+            <div className="hidden 2xl:flex items-center gap-2">{statusBadges}</div>
             {/* Language Selector: IT | EN */}
             <div className="flex items-center rounded-md border border-[#E5E7EB] bg-[#F9FAFB] p-0.5 text-xs font-bold">
               <button
@@ -191,6 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onRefresh}
               disabled={isRefreshing}
               title={t.status.refresh}
+              aria-label={t.status.refresh}
               className="p-1.5 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-md transition-colors border border-[#E5E7EB] cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#8E001C]' : ''}`} />
@@ -217,6 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 pb-2 2xl:hidden">{statusBadges}</div>
       </div>
 
       {/* Mobile Drawer */}
@@ -235,15 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
               {item.label}
             </button>
           ))}
-          <div className="pt-2 border-t border-[#E5E7EB] flex items-center justify-between text-xs text-[#6B7280]">
-            <span role="status" className="flex items-center space-x-1">
-              <span aria-hidden="true"
-                className={`w-1.5 h-1.5 rounded-full ${statusDot}`}
-              ></span>
-              <span>{statusLabel}</span>
-            </span>
-            <span>{t.status.preRelease}</span>
-          </div>
+          <div className="pt-2 border-t border-[#E5E7EB] text-xs text-[#6B7280]">{t.status.preRelease}</div>
         </div>
       )}
     </header>

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { DataSource, Freshness } from '../api/freshness.js';
-import type { Language } from '../i18n/translations';
+import { translations, type Language } from '../i18n/translations';
 
 export const freshnessColors = {
   LIVE: 'bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]',
@@ -29,20 +29,13 @@ function timestamp(value: string | null, language: Language) {
 export function DataFreshness({ freshness, source, sourceWatermark, receivedAt, language }: Props) {
   const it = language === 'it';
   const usable = freshness.status !== 'UNAVAILABLE';
-  const description = {
-    LIVE: it ? 'Dati recenti' : 'Recent data',
-    DELAYED: it ? 'Dati in ritardo' : 'Delayed data',
-    STALE: source === 'LKG'
-      ? (it ? 'Ultimi dati disponibili' : 'Latest available data')
-      : (it ? 'Dati da aggiornare' : 'Data needs refresh'),
-    UNAVAILABLE: it ? 'Dati non disponibili' : 'Data unavailable',
-  }[freshness.status];
+  const label = translations[language].status.freshnessLabels[freshness.status];
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#6B7280]" role="status" aria-live="polite">
       <span className={`rounded border px-1.5 py-0.5 font-semibold ${freshnessColors[freshness.status]}`}>
-        {freshness.status}
+        {label}
       </span>
-      <span>{description}{usable ? ` · ${it ? 'Origine' : 'Source'} ${source}` : ''}</span>
+      <span>{usable ? `${it ? 'Origine' : 'Source'} ${source}` : ''}</span>
       {usable && <>
         <span>{it ? 'Feed' : 'Source feed'} <time dateTime={sourceWatermark}>{timestamp(sourceWatermark, language)}</time></span>
         <span>{it ? 'Acquisizione valida' : 'Last valid acquisition'}{' '}

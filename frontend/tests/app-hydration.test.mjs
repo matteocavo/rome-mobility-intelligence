@@ -88,8 +88,10 @@ test('refresh keeps latest live rows visible and retains them after failure',asy
   const lastAcquisition=app.views.HeroOverview.lastValidatedAt;
   const pending=deferred(); mock.getCurrentPredictions=()=>pending.promise;
   await app.refresh();
+  assert.equal(app.views.Header.isRefreshing,true);
   assert.equal(app.views.LivePredictions.loading,false); assert.equal(app.views.LivePredictions.predictions.length,2);
   await act(async()=>pending.reject(new Error('offline')));
+  assert.equal(app.views.Header.isRefreshing,false);
   assert.equal(app.views.Header.backendOnline,false); assert.equal(app.views.HeroOverview.predictionCount,2); assert.equal(app.views.LivePredictions.predictions.length,2);
   assert.equal(app.views.HeroOverview.dataSource,'LKG');assert.equal(app.views.HeroOverview.lastValidatedAt,lastAcquisition);
  } finally {await app.close();}
