@@ -14,6 +14,7 @@ export interface Translations {
     unchecked: string;
     connected: string;
     disconnected: string;
+    degraded: string;
     connection: string;
     freshness: string;
     freshnessLabels: Record<'LIVE' | 'DELAYED' | 'STALE' | 'UNAVAILABLE', string>;
@@ -310,6 +311,7 @@ export const translations: Record<Language, Translations> = {
     status: {
       checking: 'Verifica in corso', unchecked: 'Connessione non ancora verificata',
       connected: 'Servizio connesso', disconnected: 'Servizio non disponibile',
+      degraded: 'Servizio attivo · previsioni correnti non disponibili',
       connection: 'Connessione', freshness: 'Freschezza dati',
       freshnessLabels: { LIVE: 'Dati aggiornati', DELAYED: 'Aggiornamento in ritardo',
         STALE: 'Dati non aggiornati', UNAVAILABLE: 'Dati non disponibili' },
@@ -657,6 +659,7 @@ export const translations: Record<Language, Translations> = {
     status: {
       checking: 'Checking connection', unchecked: 'Connection not yet checked',
       connected: 'Service connected', disconnected: 'Service unavailable',
+      degraded: 'Service up · current predictions unavailable',
       connection: 'Connection', freshness: 'Data freshness',
       freshnessLabels: { LIVE: 'Up-to-date data', DELAYED: 'Update delayed',
         STALE: 'Outdated data', UNAVAILABLE: 'Data unavailable' },

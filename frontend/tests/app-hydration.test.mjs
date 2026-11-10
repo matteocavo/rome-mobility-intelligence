@@ -167,7 +167,9 @@ test('current-page failure marks API unreachable and a successful page read clea
  try {
   mock.getCurrentPredictions=async()=>{throw new Error('offline');};
   await app.searchCurrent('64');
-  assert.equal(app.views.Header.backendOnline,false);assert.equal(app.views.Header.unavailable,true);
+  assert.equal(app.views.Header.backendOnline,false);
+  // Service answers history/routes: live scoring is degraded, not the whole service unavailable.
+  assert.equal(app.views.Header.unavailable,false);assert.equal(app.views.Header.degraded,true);
   assert.equal(app.views.HeroOverview.dataSource,'LKG');
   mock.getCurrentPredictions=async()=>current(2);
   await app.searchCurrent('64');
@@ -180,7 +182,7 @@ test('startup failure without bundle exposes retry and no fabricated totals',asy
  const app=await mount({},api({getCurrentPredictions:async()=>{throw new Error('offline');}}));
  try {
   assert.equal(app.views.Header.backendOnline,false);
-  assert.equal(app.views.Header.unavailable,true);
+  assert.equal(app.views.Header.unavailable,false);assert.equal(app.views.Header.degraded,true);
   assert.equal(app.views.HeroOverview.predictionCount,null);
   assert.equal(app.views.LivePredictions.predictions.length,0);
   assert.ok(document.querySelector('[role="alert"] button'));
@@ -195,5 +197,14 @@ test('mismatched source watermarks cannot replace the last-known-good population
   assert.equal(app.views.Header.backendOnline,false);
   assert.equal(app.views.HeroOverview.predictionCount,1);
   assert.equal(app.views.LivePredictions.predictions.length,1);
+ } finally {await app.close();}
+});
+
+test('fully unreachable service keeps the unavailable status and shows the snapshot as LKG',async()=>{
+ const off=async()=>{throw new Error('offline');};
+ const app=await mount(bundle,api({getSummary:off,getCurrentPredictions:off,getHistory:off,getRoutes:off}));
+ try {
+  assert.equal(app.views.Header.unavailable,true);assert.equal(app.views.Header.degraded,false);
+  assert.equal(app.views.HeroOverview.dataSource,'LKG');
  } finally {await app.close();}
 });

@@ -18,6 +18,7 @@ interface HeaderProps {
   backendOnline?: boolean;
   dataStatus?: FreshnessState;
   unavailable?: boolean;
+  degraded?: boolean;
   isChecking?: boolean;
   isWaking: boolean;
   wakingMessage: string;
@@ -35,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   backendOnline = false,
   dataStatus = 'UNAVAILABLE',
   unavailable,
+  degraded = false,
   isChecking: requestInProgress = false,
   isWaking,
   onRefresh,
@@ -45,9 +47,10 @@ export const Header: React.FC<HeaderProps> = ({
   const isConnected = backendOnline && !unavailable && !isChecking;
   const statusLabel = isChecking ? t.status.checking
     : unavailable ? t.status.disconnected
+      : degraded ? t.status.degraded
       : isConnected ? t.status.connected : t.status.unchecked;
   const statusDot = unavailable && !isChecking
-    ? 'bg-[#8E001C]' : isConnected ? 'bg-[#10B981]' : 'bg-[#FFB300]';
+    ? 'bg-[#8E001C]' : degraded ? 'bg-[#FFB300]' : isConnected ? 'bg-[#10B981]' : 'bg-[#FFB300]';
   const freshnessLabel = t.status.freshnessLabels[dataStatus];
   const statusBadges = <>
     <span role="status" aria-label={`${t.status.connection}: ${statusLabel}`}

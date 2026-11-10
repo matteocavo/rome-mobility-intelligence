@@ -46,7 +46,7 @@ export function App() {
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [catalog,setCatalog]=useState<CatalogRoute[]>([]);
   const [catalogError,setCatalogError]=useState(false);
-  useEffect(()=>{void api.getRoutes().then(setCatalog).catch(()=>setCatalogError(true));},[]);
+  useEffect(()=>{void api.getRoutes().then(routes=>{setCatalog(routes);setServiceReachable(true);}).catch(()=>setCatalogError(true));},[]);
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<CurrentPrediction | null>(null);
   const [modeFilter, setModeFilter] = useState<'all' | 'bus' | 'tram'>('all');
@@ -86,6 +86,9 @@ export function App() {
   const [pageLoaded, setPageLoaded] = useState<boolean>(!!initialSnapshot);
   const [threshold, setThreshold] = useState<number>(initialSnapshot?.current?.items?.[0]?.threshold ?? 0.35);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
+  // True only while the most recent history/routes read succeeded (last write wins; a failed history read resets it).
+  // It means "the public service answers", not "live scoring works"; it never makes data fresher.
+  const [serviceReachable, setServiceReachable] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(!initialSnapshot);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -148,8 +151,8 @@ export function App() {
     try {
       const response=await api.getHistory(params);
       if(generation!==historyGeneration.current)return;
-      setHistoryRecords(response.data.predictions);setHistoryPageInfo(response.pagination);
-    } catch { if(generation===historyGeneration.current){ if(!background){setHistoryRecords([]);setHistoryPageInfo(emptyPage);setHistoryError(true);} else {setHistoryError(false);} } }
+      setHistoryRecords(response.data.predictions);setHistoryPageInfo(response.pagination);setServiceReachable(true);
+    } catch { if(generation===historyGeneration.current){ if(!background){setHistoryRecords([]);setHistoryPageInfo(emptyPage);setHistoryError(true);} else {setHistoryError(false);} setServiceReachable(false); } }
     finally { if(generation===historyGeneration.current)setHistoryLoading(false); }
     await aggregateRequest;
   },[]);
@@ -215,6 +218,8 @@ export function App() {
     changeHistory({route,risk_class:majorOnly?'major':'all',page:1});
   };
 
+  const liveScoringFailed = error || currentError;
+  const degraded = liveScoringFailed && serviceReachable;
   const freshness = classifyFreshness({ watermark: networkSummary?.source_watermark,
     source: dataSource, receivedAt: lastValidatedAt, now: freshnessNow });
   return (
@@ -228,7 +233,8 @@ export function App() {
         isFallback={isFallback}
         backendOnline={backendOnline}
         dataStatus={freshness.status}
-        unavailable={error || currentError || loading}
+        unavailable={(liveScoringFailed && !serviceReachable) || loading}
+        degraded={degraded}
         isChecking={currentLoading}
         isWaking={isWaking || loading}
         wakingMessage={wakingMessage}
@@ -239,6 +245,11 @@ export function App() {
         {error && !initialSnapshot && <div role="alert" className="bg-white border border-[#8E001C] rounded-xl p-4">
           <p>{t.states.unavailable}. {language === 'it' ? 'Nessun dato dimostrativo viene mostrato.' : 'No synthetic data is shown.'}</p>
           <button type="button" onClick={() => loadData(true, false)} className="underline">{language === 'it' ? 'Riprova' : 'Retry'}</button>
+        </div>}
+        {degraded && dataSource === 'LKG' && lastValidatedAt && <div role="status" className="bg-white border border-[#FFB300] rounded-xl p-3 text-sm text-[#4B5563]">
+          {language === 'it'
+            ? `Le previsioni correnti non sono al momento disponibili: sono mostrati i dati dell'ultimo snapshot validato (${new Date(lastValidatedAt).toLocaleString('it-IT')}). Non sono dati in tempo reale.`
+            : `Current predictions are temporarily unavailable: the last validated snapshot (${new Date(lastValidatedAt).toLocaleString('en-GB')}) is shown. This is not real-time data.`}
         </div>}
         {!currentLoading && !currentError && !loading && !error && currentPredictions.length === 0 && <p role="status">{t.states.noCurrentData}</p>}
         <HeroOverview
