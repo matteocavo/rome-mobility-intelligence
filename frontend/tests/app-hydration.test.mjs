@@ -208,3 +208,53 @@ test('fully unreachable service keeps the unavailable status and shows the snaps
   assert.equal(app.views.HeroOverview.dataSource,'LKG');
  } finally {await app.close();}
 });
+
+test('service reachability does not depend on the completion order of routes and history',async()=>{
+ for (const order of ['routes-first','history-first']) {
+  const routes=deferred(), history=deferred(), off=async()=>{throw new Error('offline');};
+  const app=await mount(bundle,api({getCurrentPredictions:off,getSummary:off,getRoutes:()=>routes.promise,getHistory:()=>history.promise}));
+  try {
+   // Neither public source answered yet and live scoring failed: not reported as reachable.
+   assert.equal(app.views.Header.unavailable,true);assert.equal(app.views.Header.degraded,false);
+   const settle=[()=>routes.resolve([]),()=>history.reject(new Error('offline'))];
+   if (order==='history-first') settle.reverse();
+   for (const step of settle) await act(async()=>step());
+   // routes answered, history failed (either order): partially reachable.
+   assert.equal(app.views.Header.unavailable,false,order);assert.equal(app.views.Header.degraded,true,order);
+  } finally {await app.close();}
+ }
+});
+
+test('failed routes with a successful history is partial; both failing is unreachable; later reads reconnect',async()=>{
+ const off=async()=>{throw new Error('offline');};
+ const mock=api({getCurrentPredictions:off,getSummary:off,getRoutes:off});
+ const app=await mount(bundle,mock);
+ try {
+  // routes down, history answers: partially reachable.
+  assert.equal(app.views.Header.unavailable,false);assert.equal(app.views.Header.degraded,true);
+  // history now fails too: nothing answers, so the service is unreachable.
+  mock.getHistory=off; await app.refresh();
+  assert.equal(app.views.Header.unavailable,true);assert.equal(app.views.Header.degraded,false);
+  // reconnection: history answers again.
+  mock.getHistory=async()=>({data:{predictions:[]},pagination:{total:0,page:1,page_size:20,total_pages:1}}); await app.refresh();
+  assert.equal(app.views.Header.unavailable,false);assert.equal(app.views.Header.degraded,true);
+  // flapping: fails then recovers once more, and finally live scoring recovers too.
+  mock.getHistory=off; await app.refresh();
+  assert.equal(app.views.Header.unavailable,true);
+  mock.getHistory=async()=>({data:{predictions:[]},pagination:{total:0,page:1,page_size:20,total_pages:1}});
+  mock.getSummary=async()=>summary(2); mock.getCurrentPredictions=async()=>current(2); await app.refresh();
+  assert.equal(app.views.Header.unavailable,false);assert.equal(app.views.Header.degraded,false);assert.equal(app.views.HeroOverview.dataSource,'API');
+ } finally {await app.close();}
+});
+
+test('degraded banner separates snapshot capture time from the source feed watermark',async()=>{
+ const off=async()=>{throw new Error('offline');};
+ const snapshot={...JSON.parse(JSON.stringify(bundle).replaceAll(stamp,'2026-10-30T07:47:16Z')),capturedAt:'2026-10-30T09:58:53Z'};
+ const app=await mount(snapshot,api({getCurrentPredictions:off,getSummary:off}));
+ try {
+  const text=document.querySelector('[role="status"]')?.textContent??'';
+  assert.match(text,/Snapshot acquisito il 30\/10\/2026, 10:58:53/);
+  assert.match(text,/feed sorgente delle 30\/10\/2026, 08:47:16/);
+  assert.match(text,/non coincide con l'ora dei dati/);
+ } finally {await app.close();}
+});
