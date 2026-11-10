@@ -65,6 +65,7 @@ for (const language of ['it', 'en']) {
     ['unavailable', { unavailable: true }, unavailable, '#8E001C'],
     ['checking', { isChecking: true }, translations[language].status.checking, '#FFB300'],
     ['refreshing', { isRefreshing: true, backendOnline: true }, translations[language].status.checking, '#FFB300'],
+    ['degraded: service reachable, live scoring down', { degraded: true }, translations[language].status.degraded, '#FFB300'],
     ['unreachable despite prior success', { backendOnline: true, unavailable: true }, unavailable, '#8E001C'],
   ]) {
     test(`${language}: desktop status identifies ${name} in text and color`, () => {
