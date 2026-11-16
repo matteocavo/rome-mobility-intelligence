@@ -1,48 +1,29 @@
 # Rome Mobility Intelligence v1.0.1
 
-Rome Mobility Intelligence estimates the probability that a public-transport vehicle
-will arrive **at least five minutes late at its next stop** in Rome. It connects
-GTFS/GTFS-Realtime observations, a scikit-learn classifier, a FastAPI service and an
-interactive dashboard. The map shows static GTFS stops and route geometry; it does
-not track live vehicle positions.
+Rome Mobility Intelligence stima la probabilità che un mezzo del trasporto pubblico di Roma
+arrivi **con almeno cinque minuti di ritardo alla fermata successiva**. Collega osservazioni
+GTFS/GTFS-Realtime, un classificatore scikit-learn, un servizio FastAPI e una dashboard
+interattiva. La mappa mostra fermate e geometrie GTFS statiche, non le posizioni live dei veicoli.
 
-**[Open the dashboard](https://matteocavo.github.io/rome-mobility-intelligence/)** —
-the Render Free API may take time to wake from sleep. The initial view uses a
-validated last-known-good production snapshot, then hydrates from coherent API
-responses when available. Its original source timestamp remains visible: API
-reachability does not imply fresh source data, and there is no real-time SLA.
-[Freshness rules](docs/FRONTEND_DATA_FRESHNESS.md) ·
-[Setup](#setup-locale) · [Architecture](docs/ARCHITECTURE.md) ·
-[Evaluation and limitations](docs/REAL_MODEL_EVALUATION.md)
+**[Apri la dashboard](https://matteocavo.github.io/rome-mobility-intelligence/)** —
+l'API su Render Free può impiegare tempo a riattivarsi. La vista iniziale usa uno snapshot
+production validato (last-known-good) con timestamp d'origine visibile: la raggiungibilità
+dell'API non implica dati freschi e non esiste uno SLA real-time.
+[Regole di freschezza](docs/FRONTEND_DATA_FRESHNESS.md) ·
+[Setup](#setup-locale) · [Architettura](docs/ARCHITECTURE.md) ·
+[Valutazione e limiti del modello](docs/REAL_MODEL_EVALUATION.md)
 
-![Static dashboard preview; values are historical, not current observations](https://matteocavo.github.io/images/rome-mobility-intelligence-cover-panoramica.png)
+![Anteprima statica della dashboard: i valori sono storici, non osservazioni correnti](https://matteocavo.github.io/images/rome-mobility-intelligence-cover-panoramica.png)
 
-The preview is an existing portfolio screenshot, not a live status display.
+L'anteprima è uno screenshot esistente del portfolio, non uno stato live.
+Il test sklearn su un campione di 25.000 righe e i suoi limiti (holdout temporale breve,
+calibrazione delle probabilità non dimostrata, nessun confronto equivalente con Spark) sono nella
+[valutazione registrata](docs/REAL_MODEL_EVALUATION.md). Il repository
+[Rome Public Transport Reliability](https://github.com/matteocavo/rome-public-transport-reliability)
+contiene la pipeline lakehouse e Data/ML; setup, sicurezza, evidenze operative e
+architettura dettagliati restano più sotto.
 
-### What the evaluation supports
-
-The frozen sklearn TEST evaluation uses a deterministic uniform sample of **25,000
-rows** drawn from a TEST set of 481,701 rows (49 snapshots; 2 October 2026,
-00:00:00–08:03:58 UTC). The sample itself spans 00:04:05–08:03:57 UTC and its actual
-positive rate is **10.332%** (validation 19.304%; whole labeled table 18.83%), which
-matters because precision and average precision depend on prevalence. On that sample,
-precision is **0.784195**, recall **0.799071**, F1 **0.791563** and average precision
-**0.874161** at the validation-selected threshold of 0.35. These values are taken from
-[the recorded evaluation](docs/REAL_MODEL_EVALUATION.md); the historical Spark TEST
-figures listed there are not an equivalent comparison.
-
-The source table has **9,975,703 labeled rows** across eight service dates; this is
-not the evaluation sample or the fitted training size. The actual TRAIN export
-contains **81,014 rows**, with 25,000 validation and 25,000 TEST rows. This short,
-historically explored temporal holdout does not establish long-term or unseen-trip
-generalization, calibrated probabilities, or superiority over the historical
-Spark model. Further independent dates and target validation remain necessary.
-
-The companion [Rome Public Transport Reliability](https://github.com/matteocavo/rome-public-transport-reliability)
-repository owns the lakehouse and Data/ML pipeline. The detailed Italian setup,
-security, operational evidence and architecture remain below.
-
-## Operational status and recorded infrastructure evidence
+## Stato operativo ed evidenze di infrastruttura
 
 **Orchestrazione OCI opzionale — Deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
@@ -285,7 +266,7 @@ Third-party components and public transport data remain under their applicable
 upstream licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for Roma
 data attribution, licensing exceptions and the scope of the original work.
 
-If this project is useful for your transport analytics work, consider starring the repository.
+Se il progetto ti è utile per le tue analisi sul trasporto pubblico, puoi lasciare una stella al repository.
 
 ## Frontend pubblico
 
