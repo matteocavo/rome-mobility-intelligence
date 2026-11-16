@@ -1,5 +1,49 @@
 # Rome Mobility Intelligence v1.0.1
 
+Rome Mobility Intelligence estimates the probability that a public-transport vehicle
+will arrive **at least five minutes late at its next stop** in Rome. It connects
+GTFS/GTFS-Realtime observations, a scikit-learn classifier, a FastAPI service and an
+interactive dashboard. The map shows static GTFS stops and route geometry; it does
+not track live vehicle positions.
+
+**[Open the dashboard](https://matteocavo.github.io/rome-mobility-intelligence/)** —
+the Render Free API may take time to wake from sleep. The initial view uses a
+validated last-known-good production snapshot, then hydrates from coherent API
+responses when available. Its original source timestamp remains visible: API
+reachability does not imply fresh source data, and there is no real-time SLA.
+[Freshness rules](docs/FRONTEND_DATA_FRESHNESS.md) ·
+[Setup](#setup-locale) · [Architecture](docs/ARCHITECTURE.md) ·
+[Evaluation and limitations](docs/REAL_MODEL_EVALUATION.md)
+
+![Static dashboard preview; values are historical, not current observations](https://matteocavo.github.io/images/rome-mobility-intelligence-cover-panoramica.png)
+
+The preview is an existing portfolio screenshot, not a live status display.
+
+### What the evaluation supports
+
+The frozen sklearn TEST evaluation uses a deterministic uniform sample of **25,000
+rows** drawn from a TEST set of 481,701 rows (49 snapshots; 2 October 2026,
+00:00:00–08:03:58 UTC). The sample itself spans 00:04:05–08:03:57 UTC and its actual
+positive rate is **10.332%** (validation 19.304%; whole labeled table 18.83%), which
+matters because precision and average precision depend on prevalence. On that sample,
+precision is **0.784195**, recall **0.799071**, F1 **0.791563** and average precision
+**0.874161** at the validation-selected threshold of 0.35. These values are taken from
+[the recorded evaluation](docs/REAL_MODEL_EVALUATION.md); the historical Spark TEST
+figures listed there are not an equivalent comparison.
+
+The source table has **9,975,703 labeled rows** across eight service dates; this is
+not the evaluation sample or the fitted training size. The actual TRAIN export
+contains **81,014 rows**, with 25,000 validation and 25,000 TEST rows. This short,
+historically explored temporal holdout does not establish long-term or unseen-trip
+generalization, calibrated probabilities, or superiority over the historical
+Spark model. Further independent dates and target validation remain necessary.
+
+The companion [Rome Public Transport Reliability](https://github.com/matteocavo/rome-public-transport-reliability)
+repository owns the lakehouse and Data/ML pipeline. The detailed Italian setup,
+security, operational evidence and architecture remain below.
+
+## Operational status and recorded infrastructure evidence
+
 **Orchestrazione OCI opzionale — Deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
 Il test con container reali su GitHub Actions classifica E2 Micro come **MARGINAL**:
@@ -130,8 +174,11 @@ URL production: <https://matteocavo.github.io/rome-mobility-intelligence/>.
 Il frontend React/Vite usa GitHub Pages e chiama soltanto le API anonime read-only del
 backend Render; le credenziali del servizio, Databricks, Neon e l'artifact del modello
 restano lato server. Il backend legge i dati operativi da Databricks e lo storico da Neon.
-Il bundle di produzione non contiene mock o fallback sintetici: se l'API non è disponibile,
-l'interfaccia mostra lo stato di caricamento/errore e consente un nuovo tentativo.
+Il bundle di produzione non contiene mock o fallback sintetici. Il primo render usa lo
+snapshot last-known-good validato da dati production; summary e current vengono poi
+aggiornati insieme da risposte API coerenti. Se il refresh fallisce, gli ultimi dati
+validi restano visibili come LKG/STALE con il watermark originale e l'errore di connessione;
+l'interfaccia consente un nuovo tentativo.
 
 La pubblicazione usa GitHub Actions da `main`; frontend e backend sono live e gli
 endpoint pubblici sono stati verificati su dati reali. Il servizio Render Free può andare in sleep e avere un cold start; non è
@@ -171,7 +218,9 @@ Le API operative richiedono `X-RMI-Service-Key`, configurata privatamente come
 è ridotta; i dettagli richiedono la chiave. Questa credenziale non va al frontend.
 [Deployment sicuro](docs/SECURE_DEPLOYMENT.md): auth, rate/body limits, CORS/host, immagine
 non-root senza modello incluso, un worker e requisiti HTTPS/secret manager.
-Nessun deployment pubblico è stato eseguito; la configurazione production è fail-closed.
+La dichiarazione originaria di questa verifica, «Nessun deployment pubblico è stato
+eseguito», descriveva la fase precedente al rilascio. La configurazione production
+resta fail-closed; lo stato del rilascio è documentato in [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md).
 
 ```powershell
 python -m compileall -q app scripts tests
@@ -235,6 +284,8 @@ Copyright 2026 Matteo Cavo.
 Third-party components and public transport data remain under their applicable
 upstream licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for Roma
 data attribution, licensing exceptions and the scope of the original work.
+
+If this project is useful for your transport analytics work, consider starring the repository.
 
 ## Frontend pubblico
 
