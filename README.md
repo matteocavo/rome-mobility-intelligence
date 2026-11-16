@@ -1,5 +1,30 @@
 # Rome Mobility Intelligence v1.0.1
 
+Rome Mobility Intelligence stima la probabilità che un mezzo del trasporto pubblico di Roma
+arrivi **con almeno cinque minuti di ritardo alla fermata successiva**. Collega osservazioni
+GTFS/GTFS-Realtime, un classificatore scikit-learn, un servizio FastAPI e una dashboard
+interattiva. La mappa mostra fermate e geometrie GTFS statiche, non le posizioni live dei veicoli.
+
+**[Apri la dashboard](https://matteocavo.github.io/rome-mobility-intelligence/)** —
+l'API su Render Free può impiegare tempo a riattivarsi. La vista iniziale usa uno snapshot
+production validato (last-known-good) con timestamp d'origine visibile: la raggiungibilità
+dell'API non implica dati freschi e non esiste uno SLA real-time.
+[Regole di freschezza](docs/FRONTEND_DATA_FRESHNESS.md) ·
+[Setup](#setup-locale) · [Architettura](docs/ARCHITECTURE.md) ·
+[Valutazione e limiti del modello](docs/REAL_MODEL_EVALUATION.md)
+
+![Anteprima statica della dashboard: i valori sono storici, non osservazioni correnti](https://matteocavo.github.io/images/rome-mobility-intelligence-cover-panoramica.png)
+
+L'anteprima è uno screenshot esistente del portfolio, non uno stato live.
+Il test sklearn su un campione di 25.000 righe e i suoi limiti (holdout temporale breve,
+calibrazione delle probabilità non dimostrata, nessun confronto equivalente con Spark) sono nella
+[valutazione registrata](docs/REAL_MODEL_EVALUATION.md). Il repository
+[Rome Public Transport Reliability](https://github.com/matteocavo/rome-public-transport-reliability)
+contiene la pipeline lakehouse e Data/ML; setup, sicurezza, evidenze operative e
+architettura dettagliati restano più sotto.
+
+## Stato operativo ed evidenze di infrastruttura
+
 **Orchestrazione OCI opzionale — Deployment preparato; provisioning non ancora eseguito.**
 A1 Flex su OCI Always Free resta il target preferito, attualmente bloccato dalla host capacity.
 Il test con container reali su GitHub Actions classifica E2 Micro come **MARGINAL**:
@@ -130,8 +155,11 @@ URL production: <https://matteocavo.github.io/rome-mobility-intelligence/>.
 Il frontend React/Vite usa GitHub Pages e chiama soltanto le API anonime read-only del
 backend Render; le credenziali del servizio, Databricks, Neon e l'artifact del modello
 restano lato server. Il backend legge i dati operativi da Databricks e lo storico da Neon.
-Il bundle di produzione non contiene mock o fallback sintetici: se l'API non è disponibile,
-l'interfaccia mostra lo stato di caricamento/errore e consente un nuovo tentativo.
+Il bundle di produzione non contiene mock o fallback sintetici. Il primo render usa lo
+snapshot last-known-good validato da dati production; summary e current vengono poi
+aggiornati insieme da risposte API coerenti. Se il refresh fallisce, gli ultimi dati
+validi restano visibili come LKG/STALE con il watermark originale e l'errore di connessione;
+l'interfaccia consente un nuovo tentativo.
 
 La pubblicazione usa GitHub Actions da `main`; frontend e backend sono live e gli
 endpoint pubblici sono stati verificati su dati reali. Il servizio Render Free può andare in sleep e avere un cold start; non è
@@ -171,7 +199,9 @@ Le API operative richiedono `X-RMI-Service-Key`, configurata privatamente come
 è ridotta; i dettagli richiedono la chiave. Questa credenziale non va al frontend.
 [Deployment sicuro](docs/SECURE_DEPLOYMENT.md): auth, rate/body limits, CORS/host, immagine
 non-root senza modello incluso, un worker e requisiti HTTPS/secret manager.
-Nessun deployment pubblico è stato eseguito; la configurazione production è fail-closed.
+La dichiarazione originaria di questa verifica, «Nessun deployment pubblico è stato
+eseguito», descriveva la fase precedente al rilascio. La configurazione production
+resta fail-closed; lo stato del rilascio è documentato in [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md).
 
 ```powershell
 python -m compileall -q app scripts tests
@@ -235,6 +265,8 @@ Copyright 2026 Matteo Cavo.
 Third-party components and public transport data remain under their applicable
 upstream licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for Roma
 data attribution, licensing exceptions and the scope of the original work.
+
+Se il progetto ti è utile per le tue analisi sul trasporto pubblico, puoi lasciare una stella al repository.
 
 ## Frontend pubblico
 
