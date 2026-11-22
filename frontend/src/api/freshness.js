@@ -1,6 +1,6 @@
 /** Freshness describes source data independently of API reachability. */
 const LIVE_MAX_AGE_SECONDS = 120;
-const DELAYED_MAX_AGE_SECONDS = 900;
+const DELAYED_MAX_AGE_SECONDS = 16200;
 
 export function classifyFreshness({ watermark, source, receivedAt, now = Date.now() }) {
   const sourceTime = typeof watermark === 'string' ? Date.parse(watermark) : NaN;
