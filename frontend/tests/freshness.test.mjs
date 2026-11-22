@@ -7,15 +7,25 @@ const start = Date.parse(watermark);
 const status = (age, source = 'API') => classifyFreshness({ watermark, source,
   receivedAt: watermark, now: start + age * 1000 }).status;
 
-test('source age has inclusive 120s and 900s boundaries', () => {
+test('source age has inclusive 120s and 16200s boundaries', () => {
   for (const [age, expected] of [[0, 'LIVE'], [120, 'LIVE'], [120.001, 'DELAYED'],
-    [900, 'DELAYED'], [900.001, 'STALE'], [86400, 'STALE']]) {
+    [121, 'DELAYED'], [4380, 'DELAYED'], [16200, 'DELAYED'],
+    [16200.001, 'STALE'], [16201, 'STALE'], [86400, 'STALE']]) {
     assert.equal(status(age), expected);
   }
 });
 
 test('retained LKG is stale even when its source timestamp is recent', () => {
-  for (const age of [0, 120, 900, 86400]) assert.equal(status(age, 'LKG'), 'STALE');
+  for (const age of [0, 120, 121, 4380, 16200, 16201, 86400]) {
+    assert.equal(status(age, 'LKG'), 'STALE');
+  }
+});
+
+test('a new API acquisition preserves the real age of a batch source', () => {
+  const ageSeconds = 4380;
+  const now = start + ageSeconds * 1000;
+  assert.deepEqual(classifyFreshness({ watermark, source: 'API',
+    receivedAt: new Date(now).toISOString(), now }), { status: 'DELAYED', ageSeconds });
 });
 
 test('absent, invalid and future source times cannot claim live data', () => {
@@ -44,7 +54,8 @@ test('a new acquisition time never makes an old source fresh', () => {
 
 test('local reclassification runs at the next boundary without waiting another 30 seconds', () => {
   assert.equal(nextFreshnessCheck(watermark, start + 119000), 1001);
-  assert.equal(nextFreshnessCheck(watermark, start + 899000), 1001);
+  assert.equal(nextFreshnessCheck(watermark, start + 899000), 30000);
+  assert.equal(nextFreshnessCheck(watermark, start + 16199000), 1001);
   assert.equal(nextFreshnessCheck(watermark, start + 60000), 30000);
   assert.equal(nextFreshnessCheck(null, start), 30000);
 });

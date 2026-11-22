@@ -127,12 +127,14 @@ test('source freshness crosses LIVE and DELAYED boundaries while API remains rea
   assert.equal(app.views.HeroOverview.dataSource,'API');
   await act(async()=>context.mock.timers.tick(1001));
   assert.equal(app.views.Header.dataStatus,'DELAYED');
-  await act(async()=>context.mock.timers.tick(780000));
+  await act(async()=>context.mock.timers.tick(16079999));
+  assert.equal(app.views.Header.dataStatus,'DELAYED');
+  await act(async()=>context.mock.timers.tick(1));
   assert.equal(app.views.Header.dataStatus,'STALE');
   assert.equal(app.views.Header.backendOnline,true);
   assert.equal(calls,1);
   // A suspended tab reclassifies immediately on focus, using no additional API call.
-  context.mock.timers.setTime(Date.parse(stamp)+1200000);
+  context.mock.timers.setTime(Date.parse(stamp)+18000000);
   await act(async()=>window.dispatchEvent(new window.Event('focus')));
   assert.equal(app.views.Header.dataStatus,'STALE');assert.equal(calls,1);
  } finally {await app.close();context.mock.timers.reset();}
