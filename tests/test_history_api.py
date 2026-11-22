@@ -209,3 +209,53 @@ def test_readiness_without_database_ping_and_openapi(history_api):
 
     encoded = json.dumps(schema)
     assert "configured-placeholder" not in encoded and "DATABASE_URL" not in encoded
+
+
+@pytest.mark.parametrize("age", [7201, 10000])
+def test_stale_batch_rejected_without_database_write(history_api, age):
+    api, database = history_api
+    source = api.app.state.current_repository.latest.return_value
+    source["feed_timestamp"] = int(datetime.now(timezone.utc).timestamp()) - age
+    repo = Mock()
+    api.app.state.history_repository = repo
+    response = api.post("/predictions/current/persist?limit=2")
+    assert response.status_code == 422
+    assert "7200" in response.json()["detail"]
+    repo.insert_batch.assert_not_called()
+    assert database.rows == {}
+
+
+def test_batch_expiring_during_scoring_rejected(history_api, monkeypatch):
+    from app.services import batch_scoring
+
+    api, database = history_api
+    source = api.app.state.current_repository.latest.return_value
+    feed = int(datetime.now(timezone.utc).timestamp()) - 7190
+    source["feed_timestamp"] = feed
+    clock = Mock()
+    clock.now.return_value = datetime.fromtimestamp(feed + 7201, timezone.utc)
+    monkeypatch.setattr(batch_scoring, "datetime", clock)
+    response = api.post("/predictions/current/persist?limit=2")
+    assert response.status_code == 422
+    assert database.rows == {}
+
+
+def test_one_row_batch_preserves_source_and_readback(history_api):
+    api, database = history_api
+    source = api.app.state.current_repository.latest.return_value.iloc[:1].copy()
+    feed = int(datetime.now(timezone.utc).timestamp()) - 3600
+    source["feed_timestamp"] = feed
+    api.app.state.current_repository.latest.return_value = source
+    response = api.post("/predictions/current/persist?limit=1")
+    assert response.status_code == 200
+    assert response.json()["rows_inserted"] == 1
+    row = next(iter(database.rows.values()))
+    assert row["source_feed_timestamp"] == feed
+    assert row["prediction_generated_at"].timestamp() > feed
+    record = HistoryRecord(**row, id=1, created_at=datetime.now(timezone.utc))
+    repo = Mock()
+    repo.history.return_value = [record]
+    api.app.state.history_repository = repo
+    history = api.get("/predictions/history?limit=1")
+    assert history.status_code == 200
+    assert history.json()["predictions"][0]["source_feed_timestamp"] == feed
