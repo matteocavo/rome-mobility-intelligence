@@ -1,6 +1,7 @@
 """Manual scoring → minimal atomic application persistence; no Databricks writes."""
 
 import logging
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -8,6 +9,23 @@ from app.contracts.history import PersistSummary, PredictionRecord
 from app.persistence.database import DatabaseUnavailable
 
 logger = logging.getLogger(__name__)
+
+
+PERSISTENCE_MAX_SOURCE_AGE_SECONDS = 7200
+
+
+class PersistenceFreshnessError(ValueError):
+    """Source is outside the historical batch persistence admission window."""
+
+
+def validate_persistence_freshness(records, now):
+    # Check actual source times, never inference/query time or the frontend threshold.
+    for record in records:
+        age = now.timestamp() - record.source_feed_timestamp
+        if not 0 <= age <= PERSISTENCE_MAX_SOURCE_AGE_SECONDS:
+            raise PersistenceFreshnessError(
+                "Source snapshot is outside the batch persistence window"
+            )
 
 
 class BatchScoringService:
@@ -52,6 +70,7 @@ class BatchScoringService:
                     feature_preparation_batch_id=optional("feature_preparation_batch_id"),
                 )
             )
+        validate_persistence_freshness(records, datetime.now(timezone.utc))
         inserted = self.history.insert_batch(records)
         logger.info(
             "batch_scoring_completed evaluated=%d inserted=%d existing=%d",

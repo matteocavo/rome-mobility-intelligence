@@ -90,8 +90,8 @@ Preview `GET /predictions/current` uses the same scoring service and never persi
 `POST /predict` and `/predict/batch` remain stateless.
 
 Summary fields: source_watermark, rows_evaluated, rows_inserted, rows_existing, model_version,
-feature_contract_hash and threshold. No prediction rows are logged. The source may be stale:
-no new source freshness SLA is claimed and source timestamp is preserved for interpretation.
+feature_contract_hash and threshold. No prediction rows are logged. Batch persistence now requires source age at admission between 0 and 7200 seconds;
+this is not a realtime SLA. The source timestamp is preserved for interpretation.
 Running again reads the latest feed again; exact idempotence comparison requires the same feed,
 batch selection and model. No scheduler, polling, webhook, alert or n8n is introduced.
 
@@ -189,3 +189,24 @@ No frontend or n8n is included.
 References: [SQLAlchemy PostgreSQL ON CONFLICT](https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#insert-on-conflict-upsert),
 [PostgreSQL timeouts](https://www.postgresql.org/docs/current/runtime-config-client.html),
 [Alembic migrations](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
+
+
+## Batch persistence admission (7200 seconds)
+
+Before calling the history repository, the server requires every row to satisfy
+`0 <= now_utc - source_feed_timestamp <= 7200 seconds`. The check runs after
+scoring, immediately before the insert, so time spent fetching/scoring counts.
+Out-of-window requests return HTTP 422 without inserting any row. There is no
+client override. This is an application admission check, not a PostgreSQL
+commit-time constraint; transaction latency can extend age beyond admission time.
+
+The source timestamp remains unchanged; `prediction_generated_at` records
+inference time and `created_at` database insertion time. These historical batch
+records do not demonstrate realtime usefulness or future target validity. The
+frontend 16200-second display classification does not authorize persistence.
+Current prediction endpoints read Databricks, not this history table; history
+endpoints may expose an admitted row as history. Existing records are not changed.
+
+This local patch requires review and deployment before a live persistence test.
+A real Neon read-back remains required; local fake-database tests are not evidence
+of a successful production write.

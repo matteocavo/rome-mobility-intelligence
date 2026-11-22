@@ -11,7 +11,7 @@ from app.api.routes.inference import ERRORS, CurrentQuery, current_query, operat
 from app.contracts.history import HistoryQuery, HistoryResponse, PersistSummary
 from app.data.databricks_client import DataAccessError, QueryTimeoutError
 from app.persistence.database import DatabaseTimeout, DatabaseUnavailable
-from app.services.batch_scoring import BatchScoringService
+from app.services.batch_scoring import BatchScoringService, PersistenceFreshnessError
 from app.services.current_scoring import CurrentScoringService
 from app.services.model_service import ModelService
 
@@ -64,6 +64,9 @@ def persist_current(
     except (DatabaseUnavailable, DataAccessError):
         logger.warning("persistence_unavailable")
         raise HTTPException(503, "Prediction persistence temporarily unavailable") from None
+    except PersistenceFreshnessError:
+        logger.warning("persistence_source_age_rejected")
+        raise HTTPException(422, "Source snapshot must be between 0 and 7200 seconds old") from None
     except (ValueError, TypeError, KeyError):
         logger.warning("persistence_contract_rejected")
         raise HTTPException(422, "Current scoring contract is invalid") from None
