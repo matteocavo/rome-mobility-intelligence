@@ -1,9 +1,10 @@
-"""Fixed diagnostic categories only; never emit upstream messages or context."""
+"""Bounded diagnostics: fixed categories and conservative redacted HTTP 400 details."""
 
 import json
 import re
 import socket
 import urllib.error
+from uuid import uuid4
 
 CATEGORIES = frozenset({
     "databricks_authentication", "databricks_authorization",
@@ -23,6 +24,78 @@ OPERATIONS = frozenset({
 WAREHOUSE_STATES = frozenset({"STOPPED", "STARTING", "RUNNING", "STOPPING", "DELETED"})
 
 
+
+# Unknown words are withheld: raw upstream text can contain unlabelled names/secrets.
+_MESSAGE_WORDS = frozenset("""
+a an the this that these those is are was were be been being has have had do does did
+not no cannot can could must should may will would only and or but if then when while
+for from to with without in on at of by as because due before after please try again
+request invalid bad malformed missing required parameter parameters value values
+unsupported operation method endpoint api sql warehouse warehouses serverless compute
+cluster clusters session sessions open start starting stopped stop running available
+unavailable temporarily resource resources limit limits quota daily monthly free edition
+exceeded exhausted capacity insufficient maximum minimum concurrent concurrency active
+workspace workspaces account user users principal service access permission permissions
+permitted denied allowed authorized unauthorized authentication authorization token scope
+scopes expired disabled enabled configured configuration error failure failed internal
+state status does exist found unknown use manage owner admin admins administrator
+administrators feature features supported support upgrade plan billing suspended reached
+provision provisioning unable failed unable successfully current multiple single all
+entitlement entitlements must contains contain valid expected provided specified payload
+body empty json forbidden permission_denied resource_exhausted bad_request
+""".split())
+
+
+def sanitized_message(value):
+    """Lossy diagnostic projection, never raw body, arbitrary identifiers or numbers."""
+    if type(value) is not str or not value:
+        return "unavailable"
+    text = value[:4096]
+    # Remove whole credential/URL/quoted spans before retaining diagnostic vocabulary.
+    text = re.sub(r"(?i)\b(?:https?://|jdbc:|postgres(?:ql)?://)\S+", " [redacted] ", text)
+    text = re.sub(r"(?i)\b(?:authorization|proxy-authorization)\s*[:=][^\r\n]*",
+                  " [redacted] ", text)
+    text = re.sub(r"(?i)\b(?:bearer|basic)\s+\S+", " [redacted] ", text)
+    text = re.sub(r"(?i)\b(?:password|passwd|pwd|secret|token|client_secret|api_key|"
+                  r"access_token|connection_string)\s*[:=]\s*[^\s,;]+", " [redacted] ", text)
+    text = re.sub(r"[\"'][^\"']*[\"']", " [redacted] ", text)
+    text = re.sub(r"\S*@\S*", " [redacted] ", text)
+    words = []
+    for word in re.findall(r"[A-Za-z_]+|[^\sA-Za-z_]+", text):
+        safe = word if word.lower() in _MESSAGE_WORDS else "[redacted]"
+        if safe != "[redacted]" or not words or words[-1] != safe:
+            words.append(safe)
+    return " ".join(words)[:512] or "unavailable"
+
+
+def sanitized_request_id(value):
+    # UUIDs and hex trace IDs only, never arbitrary header values.
+    if type(value) is str and re.fullmatch(
+        r"(?:[a-fA-F0-9]{16}|[a-fA-F0-9]{32}|"
+        r"[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12})", value
+    ):
+        return value
+    return "unavailable"
+
+
+def _safe_details(error, payload=None):
+    context = getattr(error, "context", {})
+    context = context if isinstance(context, dict) else {}
+    value = payload if isinstance(payload, dict) else context
+    message = value.get("message", value.get("error-message"))
+    request_id = value.get("request_id", value.get("request-id"))
+    if isinstance(error, urllib.error.HTTPError):
+        headers = error.headers
+        if headers is not None:
+            request_id = (
+                headers.get("X-Databricks-Request-Id")
+                or headers.get("X-Request-Id")
+                or request_id
+            )
+    return {"message": sanitized_message(message),
+            "databricks_request_id": sanitized_request_id(request_id)}
+
+
 def failure_error_code(error):
     """Read at most 4 KiB of an HTTP rejection, retaining only an allowlisted code.
 
@@ -35,6 +108,7 @@ def failure_error_code(error):
     context = getattr(error, "context", {})
     context = context if isinstance(context, dict) else {}
     code = context.get("error_code", context.get("error-code"))
+    value = None
     if isinstance(error, urllib.error.HTTPError):
         try:
             payload = error.read(4097)
@@ -45,6 +119,13 @@ def failure_error_code(error):
             code = None
     code = code if type(code) is str and code in ERROR_CODES else "unknown"
     error._rmi_error_code = code
+    if failure_metadata(error)[0] == 400:
+        try:
+            error._rmi_safe_details = _safe_details(error, value)
+        except Exception:
+            error._rmi_safe_details = {
+                "message": "unavailable", "databricks_request_id": "unavailable",
+            }
     return code
 
 
@@ -60,6 +141,17 @@ def log_failure(logger, error, operation, elapsed_ms, *, warehouse_state="unknow
         else "unknown",
         elapsed_ms, attempt,
     )
+    if status == 400 and operation in {"session_open", "warehouse_start"}:
+        try:
+            detail = getattr(error, "_rmi_safe_details", None) or _safe_details(error)
+            logger.warning("databricks_http400_detail %s", json.dumps({
+                "operation": operation, "http_status": status,
+                "error_code": failure_error_code(error), **detail,
+                "local_correlation_id": str(uuid4()),
+            }, sort_keys=True))
+        except Exception:
+            # Diagnostics must never replace the original connection failure.
+            logger.warning("databricks_http400_detail unavailable")
     error._rmi_failure_logged = True
 
 

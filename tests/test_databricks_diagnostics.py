@@ -184,3 +184,116 @@ def test_diagnostic_fields_and_unreadable_body_fail_closed(caplog):
     assert "http_status=400 rpc=unknown error_code=unknown" in caplog.text
     assert PRIVATE not in caplog.text
     assert "private.invalid" not in caplog.text
+
+
+@pytest.mark.parametrize("operation", ["session_open", "warehouse_start"])
+def test_http400_structured_details_are_bounded_and_body_read_once(caplog, operation):
+    from uuid import UUID
+
+    upstream_id = "12345678-1234-1234-1234-123456789abc"
+    stream = Mock(wraps=io.BytesIO(json.dumps({
+        "error_code": "BAD_REQUEST",
+        "message": "Cannot start warehouse because workspace is suspended",
+        "request_id": upstream_id,
+        "private_extra": PRIVATE,
+    }).encode()))
+    error = urllib.error.HTTPError("https://private.invalid", 400, PRIVATE, {}, stream)
+    assert failure_error_code(error) == "BAD_REQUEST"
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, operation, 1)
+    details = [json.loads(r.message.split(" ", 1)[1]) for r in caplog.records
+               if r.message.startswith("databricks_http400_detail ")]
+    assert len(details) == 1
+    detail = details[0]
+    assert detail["operation"] == operation and detail["http_status"] == 400
+    assert detail["error_code"] == "BAD_REQUEST"
+    assert detail["message"] == "Cannot start warehouse because workspace is suspended"
+    assert detail["databricks_request_id"] == upstream_id
+    UUID(detail["local_correlation_id"])
+    stream.read.assert_called_once_with(4097)
+    assert PRIVATE not in caplog.text
+
+
+@pytest.mark.parametrize("secret", [
+    "Authorization: Bearer abc123secret",
+    "password=superSecretValue", "client_secret=clientSecretValue",
+    "https://private.example/object?X-Amz-Signature=secretValue",
+    "jdbc:spark://private.example;UID=alice;PWD=hidden",
+    "postgresql://alice:secret@private.example/db",
+    "alice@example.com", "AliceSmith", "dapi123456789abcdef",
+    '"private secret value"', "Bearer abc123secret", "Basic abc123secret",
+    "\r\nFORGED_EVENT=privateValue", "C:\\Users\\AliceSmith\\private.txt",
+])
+def test_message_projection_excludes_credentials_and_identifiers(secret):
+    from app.core.databricks_diagnostics import sanitized_message
+
+    text = sanitized_message("Cannot start warehouse " + secret)
+    assert "Cannot start warehouse" in text
+    assert "[redacted]" in text
+    for prohibited in ["abc123secret", "superSecretValue", "clientSecretValue", "secretValue",
+                       "private.example", "alice@example.com", "AliceSmith", "dapi123456789abcdef",
+                       "FORGED_EVENT", "privateValue", "private.txt"]:
+        assert prohibited not in text
+    assert "\n" not in text and "\r" not in text
+    assert len(text) <= 512
+
+
+def test_connector_details_use_only_own_context_not_implicit_exception(caplog):
+    error = RequestError(PRIVATE, {"http-code": 400, "method": "OpenSession",
+                                  "error-message": "Invalid access token scope",
+                                  "request-id": "a" * 32})
+    error.__context__ = RuntimeError("password=privateValue")
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, "session_open", 1)
+    assert '"message": "Invalid access token scope"' in caplog.text
+    assert '"databricks_request_id": "' + "a" * 32 in caplog.text
+    assert PRIVATE not in caplog.text and "privateValue" not in caplog.text
+
+
+@pytest.mark.parametrize("body", [b"bad json", b"[]", b"x" * 4097])
+def test_missing_details_fail_closed_and_do_not_replace_original_error(caplog, body):
+    error = urllib.error.HTTPError("https://private.invalid", 400, PRIVATE,
+                                  {"X-Request-Id": "Bearer privateValue"}, io.BytesIO(body))
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, "warehouse_start", 1)
+    assert '"message": "unavailable"' in caplog.text
+    assert '"databricks_request_id": "unavailable"' in caplog.text
+    assert PRIVATE not in caplog.text and "privateValue" not in caplog.text
+
+
+def test_http_header_request_id_and_json_cannot_inject_log(caplog):
+    error = urllib.error.HTTPError("https://private.invalid", 400, PRIVATE,
+                                  {"X-Databricks-Request-Id": "b" * 32},
+                                  io.BytesIO(json.dumps(
+                                      {"message": "Invalid request\npassword=secret"}
+                                  ).encode()))
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, "warehouse_start", 1)
+    detail = json.loads(next(r.message.split(" ", 1)[1] for r in caplog.records
+                             if r.message.startswith("databricks_http400_detail ")))
+    assert detail["databricks_request_id"] == "b" * 32
+    assert "secret" not in detail["message"] and "\n" not in detail["message"]
+
+
+@pytest.mark.parametrize("operation,status", [("select", 400), ("warehouse_get", 400),
+                                               ("warehouse_start", 503), ("session_open", 403)])
+def test_new_detail_log_is_limited_to_requested_400_operations(caplog, operation, status):
+    error = urllib.error.HTTPError(
+        "https://private.invalid", status, PRIVATE, {}, io.BytesIO(b"{}")
+    )
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, operation, 1)
+    assert "databricks_http400_detail " not in caplog.text
+
+
+
+def test_broken_optional_headers_do_not_change_failure_handling(caplog):
+    headers = Mock()
+    headers.get.side_effect = RuntimeError("private optional header failure")
+    error = urllib.error.HTTPError("https://private.invalid", 400, PRIVATE, headers,
+                                  io.BytesIO(b'{"error_code":"BAD_REQUEST"}'))
+    with caplog.at_level(logging.WARNING):
+        log_failure(logging.getLogger(__name__), error, "warehouse_start", 1)
+    assert failure_error_code(error) == "BAD_REQUEST"
+    assert '"message": "unavailable"' in caplog.text
+    assert "private optional" not in caplog.text
