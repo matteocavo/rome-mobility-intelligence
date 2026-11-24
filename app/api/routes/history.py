@@ -9,7 +9,11 @@ from pydantic import ValidationError
 
 from app.api.routes.inference import ERRORS, CurrentQuery, current_query, operational_model
 from app.contracts.history import HistoryQuery, HistoryResponse, PersistSummary
-from app.data.databricks_client import DataAccessError, QueryTimeoutError
+from app.data.databricks_client import (
+    DataAccessError,
+    DataQuotaExhaustedError,
+    QueryTimeoutError,
+)
 from app.persistence.database import DatabaseTimeout, DatabaseUnavailable
 from app.services.batch_scoring import BatchScoringService, PersistenceFreshnessError
 from app.services.current_scoring import CurrentScoringService
@@ -61,6 +65,13 @@ def persist_current(
     except (DatabaseTimeout, QueryTimeoutError):
         logger.warning("persistence_query_timeout")
         raise HTTPException(504, "Prediction persistence query timeout") from None
+    except DataQuotaExhaustedError:
+        logger.warning("persistence_quota_exhausted")
+        raise HTTPException(
+            503,
+            {"error_code": DataQuotaExhaustedError.error_code,
+             "message": DataQuotaExhaustedError.public_message},
+        ) from None
     except (DatabaseUnavailable, DataAccessError):
         logger.warning("persistence_unavailable")
         raise HTTPException(503, "Prediction persistence temporarily unavailable") from None

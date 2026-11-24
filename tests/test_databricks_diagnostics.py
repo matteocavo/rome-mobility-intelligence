@@ -297,3 +297,76 @@ def test_broken_optional_headers_do_not_change_failure_handling(caplog):
     assert failure_error_code(error) == "BAD_REQUEST"
     assert '"message": "unavailable"' in caplog.text
     assert "private optional" not in caplog.text
+
+
+# --- Databricks Free daily quota classification (simulated errors only) ---
+from app.core.databricks_diagnostics import is_daily_quota_exhausted  # noqa: E402
+from app.data.databricks_client import DataQuotaExhaustedError  # noqa: E402
+
+QUOTA_TEXT = "Your workspace reached the free daily limit of compute"
+
+
+def quota_http(code=400, error_code="BAD_REQUEST", text=QUOTA_TEXT):
+    return urllib.error.HTTPError(
+        "https://private.invalid", code, PRIVATE, {},
+        io.BytesIO(json.dumps({"error_code": error_code, "message": text}).encode()),
+    )
+
+
+def quota_open_session(text="Free daily limit", code=400):
+    return RequestError(PRIVATE, {"http-code": code, "method": "OpenSession",
+                                  "error-message": text})
+
+
+def classified(error):
+    log_failure(logging.getLogger("t"), error, "select", 1)
+    return is_daily_quota_exhausted(error)
+
+
+def test_quota_open_session_request_error_is_recognized():
+    assert classified(quota_open_session())
+
+
+def test_quota_http_warehouse_start_rejection_is_recognized():
+    assert classified(quota_http())
+
+
+def test_quota_found_through_nested_original_exception():
+    outer = RequestError(PRIVATE, {"original-exception": quota_http()})
+    assert classified(outer)
+
+
+@pytest.mark.parametrize("error", [
+    quota_open_session("Invalid parameter"),
+    quota_open_session("Free daily limit", code=503),
+    quota_open_session("Free daily limit", code=504),
+    quota_open_session("Free daily limit", code=429),
+    quota_http(error_code="INVALID_PARAMETER_VALUE"),
+    quota_http(text="Rate limit for free tier reached"),
+    quota_http(text="daily free limit"),
+    quota_http(text="limit daily free"),
+    quota_http(code=503),
+    quota_http(code=504),
+    RuntimeError(QUOTA_TEXT),
+    RequestError(QUOTA_TEXT, {"http-code": 400, "method": "ExecuteStatement"}),
+    TimeoutError(QUOTA_TEXT),
+])
+def test_non_specific_signals_are_not_quota(error):
+    assert not classified(error)
+
+
+def test_quota_message_is_never_in_the_raised_exception_or_logs(caplog):
+    connect = Mock(side_effect=quota_open_session())
+    with caplog.at_level(logging.WARNING), pytest.raises(DataQuotaExhaustedError) as caught:
+        DatabricksClient(configured(), connect).select("SELECT 1", max_rows=1)
+    text = caplog.text + str(caught.value)
+    assert "databricks_daily_quota_exhausted" in text
+    assert PRIVATE not in text and "fixture.cloud.databricks.com" not in text
+    assert caught.value.__cause__ is None
+
+
+def test_other_400_remains_generic_data_access_error():
+    connect = Mock(side_effect=quota_open_session("Invalid parameter"))
+    with pytest.raises(DataAccessError) as caught:
+        DatabricksClient(configured(), connect).select("SELECT 1", max_rows=1)
+    assert not isinstance(caught.value, DataQuotaExhaustedError)

@@ -6,7 +6,11 @@ import pytest
 from pydantic import SecretStr
 
 from app.contracts.history import HistoryRecord
-from app.data.databricks_client import DataAccessError, QueryTimeoutError
+from app.data.databricks_client import (
+    DataAccessError,
+    DataQuotaExhaustedError,
+    QueryTimeoutError,
+)
 from app.persistence.database import DatabaseTimeout, DatabaseUnavailable
 from app.persistence.history_repository import PredictionHistoryRepository
 from tests.history_fakes import FakeDatabase
@@ -74,6 +78,19 @@ def test_persist_no_arbitrary_overrides(history_api, query):
 def test_persist_body_rejected(history_api):
     api, database = history_api
     assert api.post("/predictions/current/persist", json={"limit": 1}).status_code == 422
+    assert database.rows == {}
+
+
+def test_quota_exhaustion_is_503_with_fixed_code_and_no_write(history_api):
+    api, database = history_api
+    api.app.state.current_repository.latest.side_effect = DataQuotaExhaustedError("private")
+    response = api.post("/predictions/current/persist")
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "error_code": "databricks_daily_quota_exhausted",
+        "message": "Data warehouse daily quota exhausted",
+    }
+    assert "private" not in response.text
     assert database.rows == {}
 
 

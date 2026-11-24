@@ -129,6 +129,44 @@ def failure_error_code(error):
     return code
 
 
+# Free daily limit rejection: HTTP 400 plus all three vocabulary signals, in order.
+_DAILY_QUOTA_MESSAGE = re.compile(r"\bfree\b.{0,60}\bdaily\b.{0,60}\blimit\b", re.IGNORECASE)
+
+
+def is_daily_quota_exhausted(error):
+    """True only for the Free Edition daily-limit rejection (never for other HTTP 400s).
+
+    Requires, on one and the same exception: HTTP status 400, an allowlisted
+    BAD_REQUEST code (or no code on an OpenSession rejection, where the connector
+    does not expose one) and the sanitized message containing "free ... daily ... limit".
+    Only the lossy sanitized projection is inspected; nothing raw is returned.
+    """
+    pending, seen = [error], set()
+    while pending and len(seen) < 8:
+        item = pending.pop(0)
+        if id(item) in seen or not isinstance(item, BaseException):
+            continue
+        seen.add(id(item))
+        try:
+            status, rpc = failure_metadata(item)
+            if status == 400:
+                code = failure_error_code(item)
+                if code == "BAD_REQUEST" or (code == "unknown" and rpc == "open_session"):
+                    details = getattr(item, "_rmi_safe_details", None) or {}
+                    message = details.get("message")
+                    if type(message) is str and _DAILY_QUOTA_MESSAGE.search(message):
+                        return True
+        except Exception:
+            # Classification must never replace the original failure.
+            pass
+        context = getattr(item, "context", {})
+        context = context if isinstance(context, dict) else {}
+        for nested in (context.get("original-exception"), item.__cause__):
+            if isinstance(nested, BaseException):
+                pending.append(nested)
+    return False
+
+
 def log_failure(logger, error, operation, elapsed_ms, *, warehouse_state="unknown", attempt=1):
     """One sanitized event per failed operation; the outer SELECT handler skips repeats."""
     status, rpc = failure_metadata(error)
