@@ -300,3 +300,59 @@ def test_low_code_architecture_is_community_oci_and_actions_is_fallback():
     workflow = Path(".github/workflows/persist-current-predictions.yml").read_text(encoding="utf-8")
     assert "zero-cost fallback" in workflow
     assert "RMI_ORCHESTRATION_ENABLED == 'true'" in workflow
+
+
+# --- Databricks daily quota: no pointless GitHub retries ---
+QUOTA = {"error_code": "databricks_daily_quota_exhausted"}
+
+
+def test_daily_quota_503_fails_without_retry_or_sleep():
+    client = client_with([(200, {"status": "ok"}), (200, READY), (503, QUOTA)])
+    with pytest.raises(OrchestrationError) as caught:
+        client.run()
+    assert client.request.call_count == 3
+    client.sleep.assert_not_called()
+    assert caught.value.category == "databricks_daily_quota_exhausted"
+    assert caught.value.status == 503
+
+
+def test_other_503_still_retries_as_before():
+    client = client_with([(200, {"status": "ok"}), (200, READY), (503, None), (503, None),
+                          (200, SUMMARY)])
+    client.run()
+    assert [c.args[0] for c in client.sleep.call_args_list] == [30, 60]
+
+
+def test_quota_code_with_non_503_status_is_not_special():
+    client = client_with([(200, {"status": "ok"}), (200, READY), (504, QUOTA), (504, QUOTA),
+                          (504, QUOTA)])
+    with pytest.raises(OrchestrationError):
+        client.run()
+    assert client.request.call_count == 5
+
+
+def http_error(code, body):
+    return urllib.error.HTTPError("https://api.example.org/x", code, "m", {},
+                                  io.BytesIO(body))
+
+
+def quota_body():
+    return json.dumps({"detail": {"error_code": "databricks_daily_quota_exhausted",
+                                  "message": "private-token"}}).encode()
+
+
+@pytest.mark.parametrize("code,body,expected", [
+    (503, quota_body(), QUOTA),
+    (503, json.dumps({"detail": "Scoring source temporarily unavailable"}).encode(), None),
+    (503, b"not-json", None),
+    (503, b"x" * 9000, None),
+    (504, quota_body(), None),
+    (422, quota_body(), None),
+])
+def test_http_error_exposes_only_the_quota_marker(code, body, expected):
+    client = Client("https://api.example.org", KEY, sleep=Mock())
+    opener = Mock()
+    opener.open.side_effect = http_error(code, body)
+    client.opener = opener
+    assert client.request("/predictions/current/persist?limit=100", method="POST") == (
+        code, expected)

@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 from app.contracts.inference import PredictRequest
 from app.contracts.operational_ml import FEATURES, HASH
 from app.core.config import Settings
-from app.data.databricks_client import DataAccessError, QueryTimeoutError
+from app.data.databricks_client import (
+    DataAccessError,
+    DataQuotaExhaustedError,
+    QueryTimeoutError,
+)
 from app.main import create_app
 from tests.conftest import SERVICE_KEY
 
@@ -285,3 +289,27 @@ def test_configured_lower_batch_limit(api, row):
     api.app.state.current_repository = repo
     assert api.get("/predictions/current").status_code == 503
     repo.latest.assert_called_once_with(2)
+
+
+def test_current_quota_exhaustion_is_503_with_fixed_code_only(api):
+    repo = Mock()
+    repo.latest.side_effect = DataQuotaExhaustedError("private-host-or-secret")
+    api.app.state.current_repository = repo
+    response = api.get("/predictions/current")
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "error_code": "databricks_daily_quota_exhausted",
+        "message": "Data warehouse daily quota exhausted",
+    }
+    assert "private" not in response.text
+
+
+def test_current_generic_503_and_504_unchanged(api):
+    repo = Mock()
+    api.app.state.current_repository = repo
+    repo.latest.side_effect = DataAccessError("x")
+    response = api.get("/predictions/current")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Scoring source temporarily unavailable"
+    repo.latest.side_effect = QueryTimeoutError("x")
+    assert api.get("/predictions/current").status_code == 504

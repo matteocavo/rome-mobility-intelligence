@@ -13,7 +13,11 @@ from app.contracts.inference import (
     PredictionResponse,
     PredictRequest,
 )
-from app.data.databricks_client import DataAccessError, QueryTimeoutError
+from app.data.databricks_client import (
+    DataAccessError,
+    DataQuotaExhaustedError,
+    QueryTimeoutError,
+)
 from app.services.current_scoring import CurrentScoringService
 from app.services.model_service import ModelService
 
@@ -121,6 +125,13 @@ def current(
     except QueryTimeoutError:
         logger.warning("current_scoring_deadline")
         raise HTTPException(504, "Scoring query deadline exceeded") from None
+    except DataQuotaExhaustedError:
+        logger.warning("current_scoring_quota_exhausted")
+        raise HTTPException(
+            503,
+            {"error_code": DataQuotaExhaustedError.error_code,
+             "message": DataQuotaExhaustedError.public_message},
+        ) from None
     except DataAccessError:
         logger.warning("current_scoring_unavailable")
         raise HTTPException(503, "Scoring source temporarily unavailable") from None

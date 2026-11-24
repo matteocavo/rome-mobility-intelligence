@@ -12,7 +12,11 @@ import sqlglot
 from sqlglot import exp
 
 from app.core.config import Settings
-from app.core.databricks_diagnostics import failure_metadata, log_failure
+from app.core.databricks_diagnostics import (
+    failure_metadata,
+    is_daily_quota_exhausted,
+    log_failure,
+)
 from app.core.workload_auth import WorkloadAuthenticationError, WorkloadCredentials
 from app.data.query_budget import QueryCapacityExceeded, QueryDeadlineExceeded, execute_bounded
 from app.data.warehouse_wake import recover_stopped_warehouse
@@ -26,6 +30,13 @@ class DataAccessError(RuntimeError):
 
 class ExportBudgetError(DataAccessError):
     pass
+
+
+class DataQuotaExhaustedError(DataAccessError):
+    """Databricks Free daily compute quota is exhausted; retrying cannot help today."""
+
+    error_code = "databricks_daily_quota_exhausted"
+    public_message = "Data warehouse daily quota exhausted"
 
 
 class QueryTimeoutError(DataAccessError):
@@ -137,6 +148,11 @@ class DatabricksClient:
                     log_failure(
                         logger, error, "select", round((time.perf_counter() - started) * 1000),
                     )
+                if is_daily_quota_exhausted(error):
+                    logger.warning("databricks_daily_quota_exhausted stage=select")
+                    raise DataQuotaExhaustedError(
+                        DataQuotaExhaustedError.public_message
+                    ) from None
                 raise DataAccessError("Databricks SELECT failed; diagnostics suppressed") from None
 
         try:

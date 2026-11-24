@@ -39,6 +39,7 @@ SAFE_CATEGORIES = frozenset(
         "connectivity_or_timeout",
         "invalid_json_shape",
         "invalid_persistence_response",
+        "databricks_daily_quota_exhausted",
         "not_found",
         "rate_limited",
         "response_parse_error",
@@ -50,6 +51,7 @@ SAFE_CATEGORIES = frozenset(
         "unknown",
     }
 )
+QUOTA_ERROR_CODE = "databricks_daily_quota_exhausted"
 SAFE_PATHS = frozenset(
     {"/health", "/ready", "/predictions/current/persist?limit=100", "/predictions/history?limit=10"}
 )
@@ -189,8 +191,20 @@ class Client:
                     )
                 return response.status, value
         except urllib.error.HTTPError as error:
+            # Only the fixed, allowlisted quota code is retained; never the body itself.
+            quota = False
+            if error.code == 503:
+                try:
+                    body = json.loads(error.read(4097)[:4096])
+                    detail = body.get("detail") if isinstance(body, dict) else None
+                    quota = (
+                        isinstance(detail, dict)
+                        and detail.get("error_code") == QUOTA_ERROR_CODE
+                    )
+                except Exception:
+                    quota = False
             error.close()
-            return error.code, None
+            return error.code, ({"error_code": QUOTA_ERROR_CODE} if quota else None)
         except (TimeoutError, socket.timeout):
             return 0, None
         except urllib.error.URLError as error:
@@ -276,6 +290,24 @@ class Client:
                     except OrchestrationError:
                         summary["history_followup_ok"] = False
                 return summary
+            if (
+                status == 503
+                and isinstance(data, dict)
+                and data.get("error_code") == QUOTA_ERROR_CODE
+            ):
+                # Daily quota stays exhausted until reset: retrying only burns Actions time.
+                self._record_failure(
+                    "persistence",
+                    "/predictions/current/persist?limit=100",
+                    status,
+                    QUOTA_ERROR_CODE,
+                )
+                raise OrchestrationError(
+                    "persistence",
+                    path="/predictions/current/persist?limit=100",
+                    status=status,
+                    category=QUOTA_ERROR_CODE,
+                )
             self._record_failure("persistence", "/predictions/current/persist?limit=100", status)
             if status not in {0, 503, 504} or attempt == 2:
                 category = classify_status(status)
