@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from app.contracts.history import PersistSummary, PredictionRecord
+from app.core.scoring_diagnostics import diagnose, stage
 from app.persistence.database import DatabaseUnavailable
 
 logger = logging.getLogger(__name__)
@@ -32,14 +33,18 @@ class BatchScoringService:
     def __init__(self, scoring, history, settings):
         self.scoring, self.history, self.settings = scoring, history, settings
 
+    @diagnose
     def run(self, limit: int) -> PersistSummary:
+        stage("configuration")
         if not self.settings.enable_prediction_persistence:
             raise DatabaseUnavailable("Prediction persistence disabled")
         if not 1 <= limit <= self.settings.inference_max_batch_rows:
             raise ValueError("Invalid persistence limit")
         logger.info("batch_scoring_started")
+        stage("scoring")
         scored = self.scoring.score(limit)
         response = scored.response
+        stage("persistence_record_validation")
         records = []
         for prediction, (_, source) in zip(
             response.predictions, scored.frame.iterrows(), strict=True
@@ -70,7 +75,9 @@ class BatchScoringService:
                     feature_preparation_batch_id=optional("feature_preparation_batch_id"),
                 )
             )
+        stage("freshness")
         validate_persistence_freshness(records, datetime.now(timezone.utc))
+        stage("persistence_insert")
         inserted = self.history.insert_batch(records)
         logger.info(
             "batch_scoring_completed evaluated=%d inserted=%d existing=%d",
@@ -78,6 +85,7 @@ class BatchScoringService:
             inserted,
             len(records) - inserted,
         )
+        stage("persistence_summary")
         return PersistSummary(
             source_watermark=response.source_watermark,
             model_version=response.model_version,

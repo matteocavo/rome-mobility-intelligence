@@ -8,6 +8,7 @@ import pandas as pd
 from app.contracts.inference import PredictRequest
 from app.contracts.operational_ml import CONTRACT, FEATURES, HASH, KEY
 from app.core.config import Settings
+from app.core.scoring_diagnostics import stage
 from app.data.databricks_client import DataAccessError, DatabricksClient, identifier
 
 TABLE = "`rome_transport`.`features`.`next_stop_delay_scoring`"
@@ -19,6 +20,7 @@ class CurrentScoringRepository:
         self.client, self.settings = client, settings
 
     def latest(self, limit: int) -> pd.DataFrame:
+        stage("snapshot_limit")
         if type(limit) is not int or not 1 <= limit <= self.settings.inference_max_batch_rows:
             raise ValueError("Invalid scoring limit")
         return self._latest(limit, self.settings.inference_max_bytes)
@@ -56,6 +58,7 @@ class CurrentScoringRepository:
             FROM {TABLE}
             WHERE feed_timestamp = (SELECT MAX(feed_timestamp) FROM {TABLE})
             ORDER BY {grain} LIMIT :requested_limit"""
+        stage("snapshot_query")
         frame = self.client.select(
             query,
             {"requested_limit": limit},
@@ -64,6 +67,7 @@ class CurrentScoringRepository:
             **({"compact_strings": True} if allow_empty else {}),
         )
         validation_started = time.perf_counter()
+        stage("snapshot_size")
         if frame.empty and allow_empty:
             logger.info(
                 "current_contract_validation rows=0 duration_ms=%d",
@@ -72,10 +76,13 @@ class CurrentScoringRepository:
             return frame
         if frame.empty:
             raise ValueError("No current scoring input available")
+        stage("snapshot_identity")
         if frame[list(KEY)].isna().any().any() or not frame.grain_rows.eq(1).all():
             raise ValueError("Invalid scoring grain")
+        stage("snapshot_contract")
         if frame.feed_timestamp.nunique() != 1 or not frame.feature_contract_hash.eq(HASH).all():
             raise ValueError("Invalid scoring contract")
+        stage("snapshot_lineage")
         for name in (
             "feature_contract_hash",
             "source_silver_version",
@@ -86,8 +93,10 @@ class CurrentScoringRepository:
                 raise ValueError("Missing snapshot lineage")
             if not frame[f"{name}_consistent"].eq(True).fillna(False).all():
                 raise ValueError("Ambiguous snapshot lineage")
+        stage("target_identity")
         if not frame.target_next_stop_sequence.gt(frame.stop_sequence).all():
             raise ValueError("Invalid next-stop identity")
+        stage("source_temporal")
         now = pd.Timestamp.now(tz="UTC")
         feed = pd.to_numeric(frame.feed_timestamp, errors="raise")
         prepared = pd.to_datetime(frame.feature_prepared_at, utc=True, errors="raise")
@@ -95,6 +104,7 @@ class CurrentScoringRepository:
             raise ValueError("Future or invalid scoring watermark")
         # Validate only the explicit 47-feature projection, never identifiers or targets.
         # Stream validation: never materialize N x 47 boxed values/dicts at once.
+        stage("feature_validation")
         for start in range(0, len(frame), 1024):
             chunk = frame.iloc[start : start + 1024].loc[:, list(FEATURES)]
             for values in chunk.itertuples(index=False, name=None):
