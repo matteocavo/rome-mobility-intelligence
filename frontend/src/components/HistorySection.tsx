@@ -89,7 +89,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
   };
   useEffect(()=>()=>{if(debounceTimer.current)clearTimeout(debounceTimer.current);},[]);
   return (
-    <section id="history" className="pt-2 pb-8">
+    <section id="prediction-history" className="pt-2 pb-8">
       <p className="text-xs text-gray-600 mb-2">{language==='it'?'Archivio predizioni Neon · copertura limitata ai batch salvati · orari Europe/Rome.':'Neon prediction archive · coverage limited to saved batches · Europe/Rome times.'} {source==='LKG'?(language==='it'?'Snapshot LKG, non lettura corrente di Neon.':'LKG snapshot, not a current Neon read.'):source==='API'?(language==='it'?'Origine API.':'API source.'):''}</p>
       {dateError&&<p role="alert">{language==='it'?'Ora Europe/Rome non valida o ambigua nel cambio ora: seleziona un altro orario.':'Invalid or ambiguous Europe/Rome time at a DST transition: select another time.'}</p>}
       <div className="bg-white rounded-lg border border-[#E5E7EB] shadow-xs overflow-hidden">

@@ -45,7 +45,7 @@ export function HistoricalAnalytics({ language }: {
         if (n === generation.current)
             setState('error');
     } };
-    return <section id="historical-analytics" className="my-6 p-4 sm:p-5 bg-white border border-[#E5E7EB] rounded-xl shadow-xs" aria-busy={state === 'loading'}>
+    return <section id="history" className="my-6 p-4 sm:p-5 bg-white border border-[#E5E7EB] rounded-xl shadow-xs" aria-busy={state === 'loading'}>
     <h2 className="font-bold text-lg">{it ? 'Analisi storiche osservate' : 'Observed Historical Analytics'}</h2>
     <p className="text-xs text-gray-600 mt-1">{it ? 'Storico Gold distinto dall’archivio delle predizioni Neon. Caricamento su richiesta, nessun aggiornamento o avvio warehouse automatico richiesto da questa sezione.' : 'Gold history is separate from the Neon prediction archive. Load on demand; this section requests no automatic refresh or warehouse start.'}</p>
     <div className="flex flex-wrap gap-2 my-3">{(['overview', 'routes', 'stops', 'temporal'] as AnalyticsView[]).map((v, i) => <button key={v} aria-pressed={view === v} onClick={() => { ++generation.current; setView(v); setData(null); setState('idle'); }} className={`border rounded px-3 py-2 min-h-[44px] text-sm ${view === v ? 'bg-[#8E001C] text-white' : 'bg-white'}`}>{(it ? ['Rete', 'Linee', 'Fermate', 'Tempo'] : ['Network', 'Routes', 'Stops', 'Time'])[i]}</button>)}</div>

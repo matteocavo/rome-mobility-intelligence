@@ -235,7 +235,7 @@ test('Observed analytics IT/EN exposes actual denominators and separate Gold lin
     const nulls=observedFixture();Object.assign(nulls.items[0],{known:0,missing:100000000,major:0,major_rate:null,mean_seconds:null,median_seconds:null,p90_seconds:null});
     assert.match(el(ObservedAnalyticsContent,{data:nulls,language}),language==='it'?/Non disponibile/:/Unavailable/);
     const empty={...data,view:'routes',items:[]};assert.match(el(ObservedAnalyticsContent,{data:empty,language}),language==='it'?/Nessun aggregato/:/No aggregates/);
-    const idle=el(HistoricalAnalytics,{language});assert.match(idle,language==='it'?/non ancora richiesti/:/not been requested/);
+    const idle=el(HistoricalAnalytics,{language});assert.match(idle,/id="history"/);assert.match(idle,language==='it'?/non ancora richiesti/:/not been requested/);
   }
 });
 
