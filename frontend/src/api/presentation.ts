@@ -14,3 +14,12 @@ export function observedDelay(seconds: number | null | undefined, language: Lang
   const whole = Math.round(Math.abs(seconds));
   return `${seconds < 0 ? '-' : '+'}${Math.floor(whole / 60)}m ${whole % 60}s`;
 }
+
+// Reject ambiguous/nonexistent Rome local times rather than silently choosing a DST fold.
+export function romeInputToUtc(value:string):string|null {
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return null;
+  const nominal=Date.parse(value+'Z');if(!Number.isFinite(nominal))return null;
+  const formatter=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  const matches=[3600,7200].map(offset=>new Date(nominal-offset*1000)).filter(date=>formatter.format(date).replace(' ','T')===value);
+  return matches.length===1?matches[0].toISOString():null;
+}
