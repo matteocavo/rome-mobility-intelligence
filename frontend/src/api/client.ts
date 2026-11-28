@@ -7,7 +7,7 @@ const APPROVED_ORIGIN = 'https://rome-mobility-intelligence-matteocavo.onrender.
 const configuredOrigin = import.meta.env?.VITE_PUBLIC_API_URL || APPROVED_ORIGIN;
 if (configuredOrigin.replace(/\/$/, '') !== APPROVED_ORIGIN) throw new Error('Invalid public API origin');
 const BASE_URL = import.meta.env?.DEV ? '' : APPROVED_ORIGIN;
-const ROUTES = new Set(['/public/route-map', '/public/routes', '/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history', '/public/predictions/current/aggregate', '/public/predictions/history/aggregate']);
+const ROUTES = new Set(['/public/analytics/observed','/public/route-map', '/public/routes', '/public/status', '/public/summary', '/public/predictions/current', '/public/predictions/history', '/public/predictions/current/aggregate', '/public/predictions/history/aggregate']);
 const MAX_RESPONSE_BYTES = 256000;
 export class PublicApiError extends Error {
   constructor(readonly kind: 'unavailable' | 'response' | 'query') { super(kind); }
@@ -15,14 +15,14 @@ export class PublicApiError extends Error {
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function publicGet(path: string, query = new URLSearchParams(),
-  progress?: (message: string, seconds: number) => void): Promise<any> {
+  progress?: (message: string, seconds: number) => void, noRetry = false): Promise<any> {
   if (!ROUTES.has(path)) throw new PublicApiError('query');
   const start = Date.now();
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < (noRetry ? 1 : 4); attempt++) {
     const elapsed = Math.round((Date.now() - start) / 1000);
     progress?.(elapsed < 30 ? 'Waking data service…' : 'Connecting to the latest mobility data…', elapsed);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), noRetry ? 45000 : 15000);
     try {
       const response = await fetch(`${BASE_URL}${path}${query.size ? '?' + query : ''}`, {
         method: 'GET', credentials: 'omit', redirect: 'error', signal: controller.signal,
@@ -50,7 +50,7 @@ export async function publicGet(path: string, query = new URLSearchParams(),
       if (error instanceof PublicApiError) throw error;
       // Fixed classification only; never expose raw body/network diagnostics.
     } finally { clearTimeout(timeout); }
-    if (attempt < 3) await pause((attempt + 1) * 10000);
+    if (!noRetry && attempt < 3) await pause((attempt + 1) * 10000);
   }
   throw new PublicApiError('unavailable');
 }

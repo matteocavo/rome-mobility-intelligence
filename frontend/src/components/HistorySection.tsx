@@ -1,4 +1,4 @@
-import { observedDelay, riskLabel } from '../api/presentation';
+import { observedDelay, riskLabel, romeInputToUtc } from '../api/presentation';
 import {PaginationControls} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { HistoryRecord, PageInfo, PageParams, CatalogRoute, PredictionAggregate } from '../types/api';
@@ -17,14 +17,14 @@ interface HistorySectionProps {
   aggregate?: PredictionAggregate | null;
   catalog?:CatalogRoute[];
   pageInfo?: PageInfo; onParametersChange?: (patch:PageParams)=>void; error?:boolean;
-  loading: boolean;
+  loading: boolean; source?: 'API'|'LKG'|null;
   onFilterChange: (route?: string, majorOnly?: boolean) => void;
   t: Translations;
   language: Language;
 }
 
 export const HistorySection: React.FC<HistorySectionProps> = ({
-  records, aggregate=null, catalog=[],
+  records, aggregate=null, catalog=[], source=null,
   pageInfo, onParametersChange, error,
   loading,
   onFilterChange,
@@ -36,6 +36,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
   const [search,setSearch]=useState('');
+  const [dateError,setDateError]=useState(false);
   const [sort,setSort]=useState<PageParams['sort']>('time_desc');
 
   // Filter local slice
@@ -75,7 +76,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
     .filter((bucket) => bucket.count > 0 && Number.isFinite(Date.parse(bucket.hour)))
     .slice(-6)
     .map((bucket) => ({
-      label: new Date(bucket.hour).toLocaleTimeString(language === 'it' ? 'it-IT' : 'en-GB', {hour: '2-digit', minute: '2-digit'}),
+      label: new Date(bucket.hour).toLocaleTimeString(language === 'it' ? 'it-IT' : 'en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'}),
       rate: bucket.major_count / bucket.count * 100, total: bucket.count,
     })), [aggregate, language]);
 
@@ -88,7 +89,9 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
   };
   useEffect(()=>()=>{if(debounceTimer.current)clearTimeout(debounceTimer.current);},[]);
   return (
-    <section id="history" className="pt-2 pb-8">
+    <section id="prediction-history" className="pt-2 pb-8">
+      <p className="text-xs text-gray-600 mb-2">{language==='it'?'Archivio predizioni Neon · copertura limitata ai batch salvati · orari Europe/Rome.':'Neon prediction archive · coverage limited to saved batches · Europe/Rome times.'} {source==='LKG'?(language==='it'?'Snapshot LKG, non lettura corrente di Neon.':'LKG snapshot, not a current Neon read.'):source==='API'?(language==='it'?'Origine API.':'API source.'):''}</p>
+      {dateError&&<p role="alert">{language==='it'?'Ora Europe/Rome non valida o ambigua nel cambio ora: seleziona un altro orario.':'Invalid or ambiguous Europe/Rome time at a DST transition: select another time.'}</p>}
       <div className="bg-white rounded-lg border border-[#E5E7EB] shadow-xs overflow-hidden">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-[#E5E7EB]">
@@ -118,8 +121,8 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
               </select>
             </div>}
             {onParametersChange&&<div className="flex flex-wrap gap-2 text-xs">
-              <label>{language==='it'?'Da':'From'} <input aria-label={language==='it'?'Storico da data e ora':'History from date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>sendChange({from:event.target.value?new Date(event.target.value).toISOString():undefined})}/></label>
-              <label>{language==='it'?'A':'To'} <input aria-label={language==='it'?'Storico a data e ora':'History to date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>sendChange({to:event.target.value?new Date(event.target.value).toISOString():undefined})}/></label>
+              <label>{language==='it'?'Da':'From'} <input aria-label={language==='it'?'Storico da data e ora':'History from date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>{const iso=romeInputToUtc(event.target.value);setDateError(!!event.target.value&&!iso);if(!event.target.value||iso)sendChange({from:iso??undefined});}}/></label>
+              <label>{language==='it'?'A':'To'} <input aria-label={language==='it'?'Storico a data e ora':'History to date and time'} type="datetime-local" className="border rounded p-1" onChange={event=>{const iso=romeInputToUtc(event.target.value);setDateError(!!event.target.value&&!iso);if(!event.target.value||iso)sendChange({to:iso??undefined});}}/></label>
             </div>}
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -228,9 +231,9 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit',
-                          second: '2-digit',
+                          second: '2-digit', timeZone: 'Europe/Rome',
                         })}
-                      </td>
+                      <div className="text-[10px] text-gray-500">Feed: {Number.isFinite(rec.source_feed_timestamp)?new Date(rec.source_feed_timestamp*1000).toLocaleString(language==='it'?'it-IT':'en-GB',{timeZone:'Europe/Rome'}):'—'}</div></td>
 
                       <td className="py-2.5 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-black bg-[#8E001C] text-white">

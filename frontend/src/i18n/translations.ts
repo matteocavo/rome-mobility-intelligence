@@ -462,8 +462,8 @@ export const translations: Record<Language, Translations> = {
       tripsFlagged: (flagged, total) => `${flagged} osservazioni con ritardo importante su ${total}`,
     },
     history: {
-      title: 'Storico delle osservazioni',
-      subtitle: 'Tracciamento temporale delle condizioni e archivio delle osservazioni calcolate.',
+      title: 'Archivio delle predizioni',
+      subtitle: 'Solo predizioni persistite in Neon, non lo storico completo Databricks. Date riferite alla generazione, Europe/Rome.',
       archiveLabel: 'Archivio PostgreSQL',
       filterAllLines: 'Tutte le linee',
       filterMajorOnly: 'Solo ritardi importanti',
@@ -810,8 +810,8 @@ export const translations: Record<Language, Translations> = {
       tripsFlagged: (flagged, total) => `${flagged} observations flagged with major delay out of ${total}`,
     },
     history: {
-      title: 'Observation History',
-      subtitle: 'Temporal tracking of congestion patterns and audited prediction history.',
+      title: 'Prediction archive',
+      subtitle: 'Only predictions persisted in Neon, not the complete Databricks history. Dates refer to generation, Europe/Rome.',
       archiveLabel: 'PostgreSQL archive',
       filterAllLines: 'All lines',
       filterMajorOnly: 'Only major delays',

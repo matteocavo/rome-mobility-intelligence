@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import health, history, inference, model, public
+from app.api.routes import analytics, health, history, inference, model, public
 from app.core.config import Settings
 from app.core.deployment import validate_deployment
 from app.core.http_security import HttpSecurity
@@ -14,10 +14,12 @@ from app.core.logging import configure_logging
 from app.core.service_auth import require_service_key
 from app.data.current_repository import CurrentScoringRepository
 from app.data.databricks_client import DatabricksClient
+from app.data.gold_repository import GoldRepository
 from app.data.public_geography import PublicGeography
 from app.persistence.database import Database
 from app.persistence.history_repository import PredictionHistoryRepository
 from app.persistence.public_history import PublicHistory
+from app.services.historical_analytics import HistoricalAnalytics
 from app.services.model_service import ModelService
 from app.services.public_population import PublicPopulation
 
@@ -31,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         configure_logging()
         app.state.settings = cfg
         app.state.current_repository = CurrentScoringRepository(DatabricksClient(cfg), cfg)
+        app.state.historical_analytics = HistoricalAnalytics(GoldRepository(cfg))
         app.state.database = Database(cfg)
         app.state.history_repository = PredictionHistoryRepository(app.state.database, cfg)
         geography = PublicGeography(cfg)
@@ -87,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(health.router)
     application.include_router(public.router)
+    application.include_router(analytics.router)
     service_auth = [Depends(require_service_key)]
     application.include_router(model.router, dependencies=service_auth)
     application.include_router(inference.router, dependencies=service_auth)

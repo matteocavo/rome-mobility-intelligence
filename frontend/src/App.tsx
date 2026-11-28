@@ -1,3 +1,4 @@
+import { HistoricalAnalytics } from './components/HistoricalAnalytics';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { HeroOverview } from './components/HeroOverview';
@@ -53,6 +54,7 @@ export function App() {
 
   // API Data states
   const [currentPredictions, setCurrentPredictions] = useState<CurrentPrediction[]>(initialCurrentPredictions());
+  const [historySource,setHistorySource]=useState<'API'|'LKG'|null>(initialSnapshot?.history?'LKG':null);
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>(initialHistoryRecords());
   const [modelInfo, setModelInfo] = useState<ModelInfoResponse>(DOCUMENTED_MODEL_INFO);
 
@@ -156,8 +158,8 @@ export function App() {
     try {
       const response=await api.getHistory(params);
       if(generation!==historyGeneration.current)return;
-      setHistoryRecords(response.data.predictions);setHistoryPageInfo(response.pagination);setHistoryOk(true);
-    } catch { if(generation===historyGeneration.current){ if(!background){setHistoryRecords([]);setHistoryPageInfo(emptyPage);setHistoryError(true);} else {setHistoryError(false);} setHistoryOk(false); } }
+      setHistorySource('API');setHistoryRecords(response.data.predictions);setHistoryPageInfo(response.pagination);setHistoryOk(true);
+    } catch { if(generation===historyGeneration.current){ if(!background){setHistoryRecords([]);setHistoryPageInfo(emptyPage);setHistoryError(true);} else {setHistoryError(false);} setHistorySource(previous=>previous?'LKG':null);setHistoryOk(false); } }
     finally { if(generation===historyGeneration.current)setHistoryLoading(false); }
     await aggregateRequest;
   },[]);
@@ -338,7 +340,9 @@ export function App() {
           t={t}
           language={language}
         />
+        <HistoricalAnalytics language={language}/>
         <HistorySection
+          source={historySource}
           catalog={catalog}
           records={historyRecords}
           aggregate={historyAggregate}

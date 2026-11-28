@@ -209,3 +209,75 @@ test('map distinguishes page stops from risk and uses whole-network ranking', as
     }
   } finally {globalThis.window=oldWindow;globalThis.document=oldDocument;dom.window.close();}
 });
+
+
+const observedFixture = (view='overview')=>({coverage:'gold_observed_history',view,release_id:'release-1',source_table:'rome_transport.silver.realtime_enriched_observations',source_version:263,scoring_version:300,gold_versions:{'rome_transport.gold.executive_overview':12},refreshed_at:'2026-11-28T10:00:00Z',source_watermark:'2026-11-28T09:29:37Z',query_generated_at:'2026-11-28T10:01:00Z',metric_definition:'reported_current_stop_arrival_delay_seconds',weighting:'trip_stop_snapshot_observations',timezone:'Europe/Rome',period_from:null,period_to:null,items:[{key:'network',name:null,total:100000000,known:90000000,missing:10000000,major:9000000,major_rate:.1,mean_seconds:5,median_seconds:0,p90_seconds:300,first_feed:'2026-11-01T00:00:00Z',last_feed:'2026-11-28T09:29:37Z',service_date:null,weekday:null,hour:null}],daily:[],hourly:[],heatmap:[]});
+
+test('Gold client validates coverage/counts/NULL and performs one GET without retry', async()=>{
+  const {parseObserved,getObserved}=await load('api/analytics.js');
+  const value=observedFixture();assert.equal(parseObserved(value).items[0].total,100000000);
+  for(const patch of [{coverage:'persisted_prediction_history'},{timezone:'UTC'},{items:[{...value.items[0],known:0}]},{daily:[{key:'day',total:1,known:0,major:1,major_rate:1}]}])assert.throws(()=>parseObserved({...value,...patch}));
+  const previous=globalThis.fetch;let calls=0;
+  try {
+    globalThis.fetch=async(url,options)=>{calls++;assert.match(String(url),/\/public\/analytics\/observed\?view=overview/);assert.equal(options.method,'GET');return new Response('{}',{status:503});};
+    await assert.rejects(()=>getObserved('overview'));assert.equal(calls,1);
+  } finally {globalThis.fetch=previous;}
+});
+
+test('Observed analytics IT/EN exposes actual denominators and separate Gold lineage',async()=>{
+  const {ObservedAnalyticsContent,HistoricalAnalytics}=await load('components/HistoricalAnalytics.js');
+  for(const language of ['it','en']) {
+    const data=observedFixture();
+    const html=el(ObservedAnalyticsContent,{data,language});
+    assert.match(html,/100[.,]000[.,]000/);assert.match(html,/10.0%/);assert.match(html,/9000000\/90000000/);
+    assert.match(html,/Europe\/Rome/);assert.match(html,/v263/);assert.match(html,/300/);
+    assert.doesNotMatch(html,/0\.45|Rischio elevato/);
+    const nulls=observedFixture();Object.assign(nulls.items[0],{known:0,missing:100000000,major:0,major_rate:null,mean_seconds:null,median_seconds:null,p90_seconds:null});
+    assert.match(el(ObservedAnalyticsContent,{data:nulls,language}),language==='it'?/Non disponibile/:/Unavailable/);
+    const empty={...data,view:'routes',items:[]};assert.match(el(ObservedAnalyticsContent,{data:empty,language}),language==='it'?/Nessun aggregato/:/No aggregates/);
+    const idle=el(HistoricalAnalytics,{language});assert.match(idle,/id="history"/);assert.match(idle,language==='it'?/non ancora richiesti/:/not been requested/);
+  }
+});
+
+test('Europe/Rome local inputs are browser-independent and fail on DST gaps/folds',async()=>{
+  const {romeInputToUtc}=await load('api/presentation.js');
+  assert.equal(romeInputToUtc('2026-11-28T12:00'),'2026-11-28T11:00:00.000Z');
+  assert.equal(romeInputToUtc('2026-07-28T12:00'),'2026-07-28T10:00:00.000Z');
+  assert.equal(romeInputToUtc('2026-03-29T02:30'),null);
+  assert.equal(romeInputToUtc('2026-10-25T02:30'),null);
+  assert.equal(romeInputToUtc('2026-02-30T12:00'),null);
+});
+
+test('Gold unavailable remains isolated and never loads automatically',async()=>{
+  const {JSDOM}=await import('jsdom');const {act}=await import('react');const {createRoot}=await import('react-dom/client');
+  const {HistoricalAnalytics}=await load('components/HistoricalAnalytics.js');
+  const dom=new JSDOM('<div id="app"></div>');globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  const previous=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return new Response('{}',{status:503});};
+  const root=createRoot(document.getElementById('app'));
+  try {
+    await act(async()=>root.render(React.createElement(HistoricalAnalytics,{language:'it'})));assert.equal(calls,0);
+    const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='Carica aggregati Gold');
+    await act(async()=>{button.click();await new Promise(resolve=>setTimeout(resolve,30));});
+    assert.equal(calls,1);assert.match(document.querySelector('[role="alert"]').textContent,/altre sezioni restano utilizzabili/);
+    assert.equal(document.querySelector('[aria-busy]').getAttribute('aria-busy'),'false');
+  } finally {await act(async()=>root.unmount());globalThis.fetch=previous;dom.window.close();delete globalThis.window;delete globalThis.document;delete globalThis.IS_REACT_ACT_ENVIRONMENT;}
+});
+
+
+test('Gold temporal view preserves missing heatmap cells and scrolls tables within the panel',async()=>{
+  const {ObservedAnalyticsContent}=await load('components/HistoricalAnalytics.js');
+  const data={...observedFixture('temporal'),items:[],period_from:'2026-11-28',period_to:'2026-11-28',daily:[{key:'2026-11-28',total:100,known:90,major:9,major_rate:.1}],hourly:[{key:'01',total:100,known:90,major:9,major_rate:.1}],heatmap:[{key:'6-01',total:100,known:90,major:9,major_rate:.1}]};
+  const {JSDOM}=await import('jsdom');
+  for(const language of ['it','en']) {
+    const dom=new JSDOM(el(ObservedAnalyticsContent,{data,language}));
+    try {
+      assert.match(dom.window.document.body.textContent,/10.0%/);
+      assert.equal(dom.window.document.querySelectorAll('td').length,7*24);
+      assert.equal([...dom.window.document.querySelectorAll('td')].filter(v=>v.textContent==='\u2014').length,167);
+      assert.ok(dom.window.document.querySelector('.overflow-x-auto table'));
+      assert.ok(dom.window.document.querySelector('caption'));
+      assert.match(dom.window.document.body.textContent,/Europe\/Rome/);
+      assert.doesNotMatch(dom.window.document.body.textContent,/Nessun aggregato|No aggregates/);
+    } finally {dom.window.close();}
+  }
+});
