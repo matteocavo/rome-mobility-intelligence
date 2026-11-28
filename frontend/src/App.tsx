@@ -309,6 +309,7 @@ export function App() {
           />
         ) : (
           <CentralMobilityMap
+            criticalRoutes={networkSummary?.critical_routes ?? []}
             predictions={currentPredictions}
             totalObservations={pageLoaded ? currentPageInfo.total : null}
             hasActiveFilters={Boolean(currentParams.current.route || currentParams.current.stop ||

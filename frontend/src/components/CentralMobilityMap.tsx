@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
+import { observedDelay } from '../api/presentation';
 import { CurrentPrediction } from '../types/api';
 import { stopDetails, escapeHtml } from '../api/geography';
 import {
@@ -20,6 +21,7 @@ import { Translations, Language } from '../i18n/translations';
 interface CentralMobilityMapProps {
   predictions: CurrentPrediction[];
   totalObservations: number | null;
+  criticalRoutes?: Array<{route_id:string;route_type:number|null;scored_count:number;major_delay_count:number;major_delay_rate:number}>;
   hasActiveFilters: boolean;
   selectedLine: string | null;
   onSelectLine: (routeId: string | null) => void;
@@ -34,6 +36,7 @@ interface CentralMobilityMapProps {
 export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
   predictions,
   totalObservations,
+  criticalRoutes = [],
   hasActiveFilters,
   selectedLine,
   onSelectLine,
@@ -85,31 +88,11 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
     return list;
   }, [activePredictions]);
 
-  // Ranked critical lines for the side panel
-  const criticalLines = useMemo(() => {
-    const map = new Map<string, { total: number; major: number; mode: 'Bus' | 'Tram' | '—' }>();
-    predictions.forEach((p) => {
-      const r = p.route_id || 'Altro';
-      const isTram = p.route_type === 0;
-      const existing = map.get(r) || { total: 0, major: 0, mode: isTram ? 'Tram' : p.route_type === 3 ? 'Bus' : '—' };
-      existing.total++;
-      if (p.major_delay_probability >= 0.35) {
-        existing.major++;
-      }
-      map.set(r, existing);
-    });
-
-    return Array.from(map.entries())
-      .map(([route, data]) => ({
-        route,
-        mode: data.mode,
-        total: data.total,
-        major: data.major,
-        rate: (data.major / data.total) * 100,
-      }))
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 7);
-  }, [predictions]);
+  // Whole-network aggregates only, never the risk-sorted page.
+  const criticalLines = useMemo(() => criticalRoutes.slice(0, 7).map(route => ({
+    route: route.route_id, mode: route.route_type === 0 ? 'Tram' : route.route_type === 3 ? 'Bus' : '—',
+    total: route.scored_count, major: route.major_delay_count, rate: route.major_delay_rate * 100,
+  })), [criticalRoutes]);
 
   // Initialize Map
   useEffect(() => {
@@ -206,7 +189,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
           iconAnchor: [10, 10],
         });
 
-        const stopMarker = L.marker([stop.lat, stop.lon], { icon: stopIcon });
+        const stopMarker = L.marker([stop.lat, stop.lon], { icon: stopIcon, title: stop.name, alt: stop.name });
         stopMarker.bindPopup(`
           <div style="font-family: inherit; font-size: 12px;">
             <div style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">
@@ -235,8 +218,8 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
       boundsPoints.push([offsetLat, offsetLon]);
 
       const isTram = veh.route_type === 0;
-      const isMajor = veh.major_delay_probability >= 0.35;
-      const isModerate = !isMajor && (veh.major_delay_probability >= 0.2 || (veh.current_arrival_delay_seconds || 0) >= 120);
+      const isMajor = veh.predicted_major_delay;
+      const isModerate = !isMajor && veh.major_delay_probability >= 0.2;
 
       const statusDotColor = isMajor ? '#8E001C' : isModerate ? '#FFB300' : '#10B981';
       const isCurrentSelected = selectedVehicle?.trip_id === veh.trip_id;
@@ -300,15 +283,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
     }
   }, [activePredictions, mappedStops, selectedLine, selectedVehicle, language, onSelectVehicle, onSelectLine]);
 
-  const formatDelay = (seconds: number | null | undefined) => {
-    if (seconds === null || seconds === undefined) return '0s';
-    const abs = Math.abs(seconds);
-    const mins = Math.floor(abs / 60);
-    const secs = Math.round(abs % 60);
-    const sign = seconds < 0 ? '-' : '+';
-    if (mins === 0) return `${sign}${secs}s`;
-    return `${sign}${mins}m ${secs}s`;
-  };
+  const formatDelay = (seconds: number | null | undefined) => observedDelay(seconds, language);
 
   return (
     <div className="mb-8">
@@ -334,7 +309,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
               <span className="text-[#9CA3AF]">•</span>
               <span className="font-mono text-xs font-bold text-[#8E001C]">
                 {activePredictions.length.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
-                {language === 'it' ? ' osservazioni visualizzate su ' : ' observations shown out of '}
+                {language === 'it' ? ' osservazioni nella pagina su ' : ' observations on this page out of '}
                 {totalObservations === null ? t.states.noValue : totalObservations.toLocaleString(language === 'it' ? 'it-IT' : 'en-US')}
                 {language === 'it'
                   ? hasActiveFilters ? ' risultati' : ' correnti'
@@ -396,18 +371,10 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
 
           {/* Map Legend Overlay at Bottom-Left */}
           <div className="absolute bottom-3 left-3 z-20 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#E5E7EB] shadow-xs flex items-center space-x-3 text-[11px] text-[#4B5563]">
-            <span className="flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-              <span>{t.currentSituation.statuses.normal}</span>
-            </span>
-            <span className="flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#FFB300]"></span>
-              <span>{t.currentSituation.statuses.moderateDelay}</span>
-            </span>
-            <span className="flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#8E001C]"></span>
-              <span>{t.currentSituation.statuses.majorDelay}</span>
-            </span>
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-[#8E001C] bg-white" aria-hidden="true" />
+            <span>{language === 'it'
+              ? `${mappedStops.length} fermate GTFS · pagina corrente · numero = sequenza, non cluster`
+              : `${mappedStops.length} GTFS stops · current page · number = sequence, not cluster`}</span>
           </div>
         </div>
 
@@ -528,12 +495,12 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                     <AlertTriangle className="w-4 h-4 text-[#8E001C]" />
                     <span>
                       {selectedLine
-                        ? `${language === 'it' ? 'Mezzi sulla linea' : 'Vehicles on route'} ${selectedLine}`
+                        ? `${language === 'it' ? 'Osservazioni sulla linea' : 'Observations on route'} ${selectedLine}`
                         : t.visualizations.criticalLinesTitle}
                     </span>
                   </h3>
                   <span className="text-[10px] font-bold text-[#8E001C] bg-[#FDF2F4] px-1.5 py-0.5 rounded">
-                    {t.status.liveApi}
+                    {language === 'it' ? 'Rete intera' : 'Whole network'}
                   </span>
                 </div>
                 <p className="text-xs text-[#6B7280] mb-3 leading-relaxed">
@@ -541,7 +508,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                     ? language === 'it'
                       ? 'Clicca su un veicolo sulla mappa o nell’elenco per esaminarne la telemetria.'
                       : 'Click any vehicle pin on the map or list below to inspect arrival telemetry.'
-                    : t.visualizations.criticalLinesSubtitle}
+                    : (language === 'it' ? 'Classifica su tutte le osservazioni della rete, non sulla pagina visualizzata.' : 'Ranking over all network observations, not the displayed page.')}
                 </p>
               </div>
 
@@ -603,7 +570,7 @@ export const CentralMobilityMap: React.FC<CentralMobilityMapProps> = ({
                             {item.mode} {item.route}
                           </span>
                           <span className="text-[#6B7280] text-[11px]">
-                            • {item.major}/{item.total} {language === 'it' ? 'in ritardo' : 'delayed'}
+                            • {item.major}/{item.total} {language === 'it' ? 'osservazioni a rischio' : 'observations at high risk'}
                           </span>
                         </div>
 

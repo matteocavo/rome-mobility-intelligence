@@ -112,7 +112,7 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-4 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#4B5563] mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">
-              {language === 'it' ? 'RISCHIO RITARDO IMPORTANTE' : 'MAJOR-DELAY RISK'}
+              {language === 'it' ? 'OSSERVAZIONI A RISCHIO ELEVATO' : 'HIGH-RISK OBSERVATIONS'}
             </span>
             <div className="p-1.5 rounded-md bg-[#FDF2F4] text-[#8E001C]">
               <AlertTriangle className="w-3.5 h-3.5" />
@@ -128,10 +128,10 @@ export const HeroOverview: React.FC<HeroOverviewProps> = ({
           </div>
           <div className="pt-2 flex items-center justify-between border-t border-[#F9FAFB]">
             <span className="text-xs text-[#6B7280]">
-              {language === 'it' ? 'Rischio predetto di ritardo ≥ 5 min' : 'Predicted risk of delay ≥ 5 min'}
+              {language === 'it' ? 'Quota classificata positiva · p ≥ 0,35' : 'Share classified positive · p ≥ 0.35'}
             </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#8E001C] border border-[#F1C3CA]">
-              {majorCount === null ? '—' : (language === 'it' ? 'ELEVATO' : 'HIGH')}
+              {language === 'it' ? 'Classificazione ML' : 'ML classification'}
             </span>
           </div>
         </div>

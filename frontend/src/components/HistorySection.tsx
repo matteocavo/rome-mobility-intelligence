@@ -1,3 +1,4 @@
+import { observedDelay, riskLabel } from '../api/presentation';
 import {PaginationControls} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { HistoryRecord, PageInfo, PageParams, CatalogRoute, PredictionAggregate } from '../types/api';
@@ -214,10 +215,8 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                 </tr>
               ) : (
                 pageRecords.map((rec) => {
-                  const delaySec = rec.current_arrival_delay_seconds || 0;
-                  const mins = Math.floor(Math.abs(delaySec) / 60);
-                  const secs = Math.round(Math.abs(delaySec) % 60);
-                  const delayFormatted = `${delaySec < 0 ? '-' : '+'}${mins}m ${secs}s`;
+                  const delaySec = rec.current_arrival_delay_seconds;
+                  const delayFormatted = observedDelay(delaySec, language);
                   const stopName =
                     rec.stop_name || (rec.stop_id && undefined) || rec.stop_id;
 
@@ -247,7 +246,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                       </td>
 
                       <td className="py-2.5 px-4 font-mono font-semibold whitespace-nowrap">
-                        <span className={delaySec >= 300 ? 'text-[#8E001C]' : 'text-[#111827]'}>
+                        <span className={delaySec != null && delaySec >= 300 ? 'text-[#8E001C]' : 'text-[#111827]'}>
                           {delayFormatted}
                         </span>
                       </td>
@@ -260,7 +259,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                           <div className="w-16 h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
                             <div
                               className={`h-full ${
-                                rec.predicted_major_delay ? 'bg-[#8E001C]' : 'bg-[#FFB300]'
+                                rec.predicted_major_delay ? 'bg-[#8E001C]' : rec.major_delay_probability >= .2 ? 'bg-[#FFB300]' : 'bg-[#10B981]'
                               }`}
                               style={{ width: `${Math.min(100, rec.major_delay_probability * 100)}%` }}
                             ></div>
@@ -273,12 +272,10 @@ export const HistorySection: React.FC<HistorySectionProps> = ({
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
                             rec.predicted_major_delay
                               ? 'bg-[#FDF2F4] text-[#8E001C] border-[#F1C3CA]'
-                              : 'bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]'
+                              : rec.major_delay_probability >= .2 ? 'bg-[#FFF9E6] text-[#9A6700] border-[#FEEA9F]' : 'bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]'
                           }`}
                         >
-                          {rec.predicted_major_delay
-                            ? t.currentSituation.statuses.majorDelay
-                            : t.currentSituation.statuses.normal}
+                          {riskLabel(rec.major_delay_probability, rec.threshold, language)}
                         </span>
                       </td>
 

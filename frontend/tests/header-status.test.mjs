@@ -12,7 +12,7 @@ import { JSDOM } from 'jsdom';
 const temporary = mkdtempSync(join(resolve('tests'), '.compiled-header-'));
 after(() => rmSync(temporary, { recursive: true, force: true }));
 for (const file of ['components/Header.tsx', 'components/GithubIcon.tsx', 'i18n/translations.ts',
-  'components/CentralMobilityMap.tsx', 'api/geography.ts']) {
+  'components/CentralMobilityMap.tsx', 'api/geography.ts', 'api/presentation.ts']) {
   let code = ts.transpileModule(readFileSync(join('src', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText.replace(/(from\s+['"])(\.[^'"]+)(['"])/g,
@@ -38,7 +38,7 @@ for (const count of [3, 10]) {
     const predictions = Array.from({ length: count }, (_, i) => ({ route_id: `route-${i}`,
       stop_id: `stop-${i}`, trip_id: `trip-${i}`, route_type: 3, major_delay_probability: .9 }));
     const dom = new JSDOM(renderToStaticMarkup(React.createElement(CentralMobilityMap, {
-      predictions, totalObservations: count, hasActiveFilters: false, selectedLine: null,
+      predictions, criticalRoutes: predictions.map(p=>({route_id:p.route_id,route_type:3,scored_count:100,major_delay_count:10,major_delay_rate:.1})), totalObservations: count, hasActiveFilters: false, selectedLine: null,
       selectedVehicle: null, modeFilter: 'all', onSelectLine() {}, onSelectVehicle() {},
       onSetModeFilter() {}, language: 'it', t: translations.it,
     })));
