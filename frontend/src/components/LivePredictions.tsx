@@ -1,3 +1,4 @@
+import { observedDelay, riskLabel } from '../api/presentation';
 import {PaginationControls, rangeLabel} from './PaginationControls';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { CurrentPrediction, PageInfo, PageParams, CatalogRoute } from '../types/api';
@@ -106,41 +107,26 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
     sendChange({sort:field==='delay'?'delay_desc':field==='line'?'route_asc':'risk_desc'});
   };
 
-  const formatDelay = (seconds: number | null | undefined) => {
-    if (seconds === null || seconds === undefined) return '0s';
-    const abs = Math.abs(seconds);
-    const mins = Math.floor(abs / 60);
-    const secs = Math.round(abs % 60);
-    const sign = seconds < 0 ? '-' : '+';
-    if (mins === 0) return `${sign}${secs}s`;
-    return `${sign}${mins}m ${secs}s`;
-  };
+  const formatDelay = (seconds: number | null | undefined) => observedDelay(seconds, language);
 
   const getSemanticStatus = (probability: number, delaySec: number | null) => {
     const delay = delaySec || 0;
     if (probability >= threshold) {
       return {
-        label: t.currentSituation.statuses.majorDelay,
+        label: riskLabel(probability, threshold, language),
         color: 'text-[#8E001C] bg-[#FDF2F4] border-[#F1C3CA]',
         barColor: 'bg-[#8E001C]',
       };
     }
     if (probability >= 0.2) {
       return {
-        label: t.currentSituation.statuses.moderateDelay,
+        label: riskLabel(probability, threshold, language),
         color: 'text-[#9A6700] bg-[#FFF9E6] border-[#FEEA9F]',
         barColor: 'bg-[#FFB300]',
       };
     }
-    if (delay > 30) {
-      return {
-        label: t.currentSituation.statuses.minorDelay,
-        color: 'text-[#0369A1] bg-[#F0F9FF] border-[#BAE6FD]',
-        barColor: 'bg-[#0284C7]',
-      };
-    }
     return {
-      label: t.currentSituation.statuses.normal,
+      label: riskLabel(probability, threshold, language),
       color: 'text-[#065F46] bg-[#ECFDF5] border-[#A7F3D0]',
       barColor: 'bg-[#10B981]',
     };
@@ -400,13 +386,7 @@ export const LivePredictions: React.FC<LivePredictionsProps> = ({
                               {(pred.major_delay_probability * 100).toFixed(1)}%
                             </span>
                             <span className="text-[10px] text-[#6B7280]">
-                              {pred.major_delay_probability >= threshold
-                                ? language === 'it'
-                                  ? 'Rischio elevato'
-                                  : 'High risk'
-                                : language === 'it'
-                                ? 'Rischio contenuto'
-                                : 'Low risk'}
+                              {riskLabel(pred.major_delay_probability, threshold, language)}
                             </span>
                           </div>
                           <div className="relative w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">

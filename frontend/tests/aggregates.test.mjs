@@ -173,3 +173,39 @@ test('model and claim copy matches the audited methodology and the data model', 
   assert.equal(translations.it.states.noCurrentData,'Nessun dato corrente');
   assert.equal(translations.en.states.noCurrentData,'No current data');
 });
+
+
+test('risk thresholds and observed NULL are distinct in both languages', async () => {
+  const {riskClass,riskLabel,observedDelay}=await load('api/presentation.js');
+  for(const [p,expected] of [[0,'regular'],[.19999,'regular'],[.2,'moderate'],[.34999,'moderate'],[.35,'major'],[1,'major']])assert.equal(riskClass(p),expected);
+  assert.equal(observedDelay(0,'it'),'+0m 0s');
+  for(const language of ['it','en']) {
+    assert.match(observedDelay(null,language),language==='it'?/Non disponibile/:/Unavailable/);
+    assert.match(riskLabel(.2,.35,language),language==='it'?/moderato/:/Moderate/);
+    const {HeroOverview}=await load('components/HeroOverview.js');
+    const html=el(HeroOverview,{predictionCount:100,majorCount:0,medianDelaySeconds:0,p90DelaySeconds:0,sourceWatermark:'',sourceAgeSeconds:0,t:translations[language],language});
+    assert.match(html,/>0%/);assert.doesNotMatch(html,/>ELEVATO<|>HIGH</);
+    const {LivePredictions}=await load('components/LivePredictions.js');
+    const live=el(LivePredictions,{predictions:[{...row(1),major_delay_probability:.2,current_arrival_delay_seconds:null}],threshold:.35,loading:false,selectedLine:null,onSelectLine(){},t:translations[language],language});
+    assert.match(live,language==='it'?/Rischio moderato/:/Moderate risk/);
+    assert.doesNotMatch(live,/\+0m 0s/);
+    const {HistorySection}=await load('components/HistorySection.js');
+    const history=el(HistorySection,{records:[{...row(1),id:1,prediction_generated_at:'2026-11-01T12:00:00Z',created_at:'2026-11-01T12:00:00Z',current_arrival_delay_seconds:null}],loading:false,onFilterChange(){},t:translations[language],language});
+    assert.match(history,language==='it'?/Non disponibile/:/Unavailable/);assert.doesNotMatch(history,/\+0m 0s/);
+  }
+});
+
+test('map distinguishes page stops from risk and uses whole-network ranking', async () => {
+  const {JSDOM}=await import('jsdom');const dom=new JSDOM('<div></div>');
+  const oldWindow=globalThis.window,oldDocument=globalThis.document;
+  globalThis.window=dom.window;globalThis.document=dom.window.document;
+  try {
+    const {CentralMobilityMap}=await load('components/CentralMobilityMap.js');
+    for(const language of ['it','en']) {
+      const html=el(CentralMobilityMap,{predictions:page.map(r=>({...r,stop_lat:41.9,stop_lon:12.5,major_delay_probability:.9})),totalObservations:1000,criticalRoutes:[{route_id:'907',route_type:3,scored_count:100,major_delay_count:2,major_delay_rate:.02}],hasActiveFilters:false,selectedLine:null,onSelectLine(){},selectedVehicle:null,onSelectVehicle(){},modeFilter:'all',onSetModeFilter(){},t:translations[language],language});
+      assert.match(html,/20 GTFS stops|20 fermate GTFS/);assert.match(html,/non cluster|not cluster/);
+      assert.match(html,/2\/100/);assert.match(html,/>2%/);assert.doesNotMatch(html,/20\/20|>100%/);
+      assert.match(html,/pagina|page/);
+    }
+  } finally {globalThis.window=oldWindow;globalThis.document=oldDocument;dom.window.close();}
+});

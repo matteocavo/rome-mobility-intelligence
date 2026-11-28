@@ -1,3 +1,4 @@
+import { observedDelay, riskLabel } from '../api/presentation';
 import React, { useState } from 'react';
 import { ArrowLeft, Clock, Bus, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, MapPin, Gauge } from 'lucide-react';
 import { CurrentPrediction, PredictionAggregate } from '../types/api';
@@ -36,33 +37,25 @@ export const LineDetailView: React.FC<LineDetailViewProps> = ({
   const isTram = routeType === 0;
   const mode = isTram ? 'Tram' : routeType === 3 ? 'Bus' : '—';
 
-  const formatDelay = (seconds: number | null | undefined) => {
-    if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return t.states.noValue;
-    const abs = Math.abs(seconds);
-    const mins = Math.floor(abs / 60);
-    const secs = Math.round(abs % 60);
-    const sign = seconds < 0 ? '-' : '+';
-    if (mins === 0) return `${sign}${secs}s`;
-    return `${sign}${mins}m ${secs}s`;
-  };
+  const formatDelay = (seconds: number | null | undefined) => seconds == null || !Number.isFinite(seconds) ? t.states.noValue : observedDelay(seconds, language);
 
   const getSemanticStatus = (probability: number) => {
     if (probability >= 0.35) {
       return {
-        label: t.currentSituation.statuses.majorDelay,
+        label: riskLabel(probability, .35, language),
         color: 'text-[#8E001C] bg-[#FDF2F4] border-[#F1C3CA]',
         barColor: 'bg-[#8E001C]',
       };
     }
     if (probability >= 0.2) {
       return {
-        label: t.currentSituation.statuses.moderateDelay,
+        label: riskLabel(probability, .35, language),
         color: 'text-[#9A6700] bg-[#FFF9E6] border-[#FEEA9F]',
         barColor: 'bg-[#FFB300]',
       };
     }
     return {
-      label: t.currentSituation.statuses.normal,
+      label: riskLabel(probability, .35, language),
       color: 'text-[#065F46] bg-[#ECFDF5] border-[#A7F3D0]',
       barColor: 'bg-[#10B981]',
     };
