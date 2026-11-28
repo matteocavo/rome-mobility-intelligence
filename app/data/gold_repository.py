@@ -88,7 +88,7 @@ class GoldRepository:
             )
             where += " AND service_date >= :start AND service_date <= :end"
             params.update(start=start, end=end)
-            order, cap = "service_date, feed_hour", 744
+            order, cap = "service_date, day_of_week, feed_hour", 5208
         limit = cap if view in {"routes", "stops"} else cap + 1
         return self.select(
             f"SELECT {extra}, {COLUMNS} FROM {PREFIX}{table} VERSION AS OF {version} "

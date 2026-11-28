@@ -240,3 +240,16 @@ def test_public_boundary_sanitized_errors_and_no_model_required(caplog):
         error = client.get("/public/analytics/observed")
         assert error.status_code == 503 and "private-token" not in error.text + caplog.text
         assert client.get("/health").status_code == 200
+
+
+def test_service_day_can_cover_same_clock_hour_on_two_feed_weekdays():
+    first = row()
+    first.update(key="2026-11-27", service_date=date(2026, 11, 27), weekday=5, hour=1)
+    second = dict(first, weekday=6)
+    target, _, _ = service([first, second])
+    result = target.get(
+        AnalyticsQuery(view="temporal", **{"from": "2026-11-27", "to": "2026-11-27"})
+    )
+    assert result.daily[0].total == 200
+    assert result.hourly[0].known == 180
+    assert [v.key for v in result.heatmap] == ["5-01", "6-01"]

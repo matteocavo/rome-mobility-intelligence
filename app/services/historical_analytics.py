@@ -143,7 +143,7 @@ class HistoricalAnalytics:
                         ):
                             raise ValueError("Invalid temporal grain")
                     items.append(item)
-                identities = [(v.key, v.hour) for v in items]
+                identities = [(v.key, v.weekday, v.hour) for v in items]
                 if len(identities) != len(set(identities)) or (
                     query.view == "overview" and len(items) != 1
                 ):
